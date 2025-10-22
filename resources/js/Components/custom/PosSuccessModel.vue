@@ -232,39 +232,42 @@ const handlePrintReceipt = () => {
 <body>
   <div class="receipt-container">
     <!-- Header -->
-    <div class="header-line">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-        <div style="flex-shrink:0; text-align:right;">
-          <img src="/images/billlogo.png" alt="Company Logo" style="width:60px; height:60px; object-fit:contain;" />
-        </div>
-        <div style="text-align:right; flex-grow:1; padding-left:15px; color:#000;">
-          ${
-            companyInfo?.value?.name
-              ? `<h1 style="margin:0; font-size:16px; font-weight:bold;">${companyInfo.value.name}</h1>`
-              : ""
-          }
-          ${
-            companyInfo?.value?.address
-              ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.address}</p>`
-              : ""
-          }
-          ${
-            (companyInfo?.value?.phone || companyInfo?.value?.phone2 || companyInfo?.value?.email)
-              ? `<p style="margin:2px 0; font-size:12px;">
-                   ${companyInfo.value.phone || ""}
-                   ${companyInfo.value.phone2 ? " | " + companyInfo.value.phone2 : ""}
-                   ${companyInfo.value.email ? " | " + companyInfo.value.email : ""}
-                 </p>`
-              : ""
-          }
-          ${
-            companyInfo?.value?.website
-              ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.website}</p>`
-              : ""
-          }
-        </div>
-      </div>
+   <div class="header-line">
+  <div style="display:flex; justify-content:center; align-items:center;">
+    <!--
+    <div style="flex-shrink:0; text-align:right;">
+      <img src="/images/billlogo.jpg" alt="Company Logo" style="width:100px; height:100px; object-fit:contain; margin-top:15px;" />
     </div>
+    -->
+    <div style="text-align:center; flex-grow:1; color:#000;">
+      ${
+        companyInfo?.value?.name
+          ? `<h1 style="margin:0; font-size:16px; font-weight:bold;">${companyInfo.value.name}</h1>`
+          : ""
+      }
+      ${
+        companyInfo?.value?.address
+          ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.address}</p>`
+          : ""
+      }
+      ${
+        (companyInfo?.value?.phone || companyInfo?.value?.phone2 || companyInfo?.value?.email)
+          ? `<p style="margin:2px 0; font-size:12px;">
+               ${companyInfo.value.phone || ""}
+               ${companyInfo.value.phone2 ? " | " + companyInfo.value.phone2 : ""}
+               ${companyInfo.value.email ? " | " + companyInfo.value.email : ""}
+             </p>`
+          : ""
+      }
+      ${
+        companyInfo?.value?.website
+          ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.website}</p>`
+          : ""
+      }
+    </div>
+  </div>
+</div>
+
 
     <div class="info-row">
       <div>
@@ -342,6 +345,7 @@ const handlePrintReceipt = () => {
     </div>
 
     <div class="footer">
+      <p>Items can be exchanged within seven (7) days of purchase. No cash refunds will be provided for issued items.</p>
       <p>THANK YOU COME AGAIN</p>
       <p style="font-weight:bold;">Powered by JAAN Network Ltd.</p>
     </div>

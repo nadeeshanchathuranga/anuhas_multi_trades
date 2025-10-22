@@ -262,7 +262,7 @@ public function fetchProducts(Request $request)
             'preorder_level_qty' => 'nullable|integer|min:0',
 
             'supplier_id' => 'nullable|exists:suppliers,id',
-            'barcode' => 'nullable|string|unique:products',
+            'barcode' => 'nullable|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'expire_date' => 'nullable|date',
             'expiry_date_margin' => 'nullable|integer|min:0',
@@ -369,11 +369,7 @@ public function fetchProducts(Request $request)
                 'max:50',
                 Rule::unique('products')->whereNull('deleted_at'),
             ],
-            'barcode' => [
-                'nullable',
-                'string',
-                Rule::unique('products')->whereNull('deleted_at'),
-            ],
+           'barcode' => 'nullable|string|max:255',
             'size_id' => 'nullable|exists:sizes,id',
             'color_id' => 'nullable|exists:colors,id',
             'cost_price' => 'nullable|numeric|min:0',
@@ -724,6 +720,63 @@ public function fetchProducts(Request $request)
         }
 
         return back()->with('success', 'CSV uploaded and products saved successfully.');
+    }
+
+    public function getNextBatchByBarcode(Request $request)
+{
+    $barcode = $request->input('barcode');
+
+    // Check if any product with this barcode exists
+    $existingProducts = Product::where('barcode', $barcode)
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+    if ($existingProducts->isEmpty()) {
+        // New barcode - start with batch1
+        return response()->json(['next_batch_no' => 'batch1']);
+    }
+
+    // Existing barcode - find the highest batch number
+    $latestBatch = $existingProducts
+        ->pluck('batch_no')
+        ->filter()
+        ->map(function ($batch) {
+            if (preg_match('/batch(\d+)/i', $batch, $matches)) {
+                return (int) $matches[1];
+            }
+            return 0;
+        })
+        ->max();
+
+    $nextBatchNumber = ($latestBatch ?? 0) + 1;
+    $nextBatch = 'batch' . $nextBatchNumber;
+
+    return response()->json(['next_batch_no' => $nextBatch]);
+}
+ public function getProductByBarcode(Request $request)
+    {
+        $barcode = $request->input('barcode');
+        
+        if (!$barcode) {
+            return response()->json(['error' => 'Barcode is required'], 400);
+        }
+
+        // Find the most recent product with this barcode
+        $product = Product::where('barcode', $barcode)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($product) {
+            return response()->json([
+                'product' => [
+                    'name' => $product->name,
+                    'code' => $product->code,
+                   
+                ]
+            ]);
+        }
+
+        return response()->json(['product' => null]);
     }
 
 

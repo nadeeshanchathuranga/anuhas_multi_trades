@@ -579,6 +579,49 @@
       </div>
     </div>
 
+    <!-- Batch Selection Modal -->
+    <div v-if="showBatchSelection" class="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
+      <div class="bg-white rounded-2xl w-full max-w-2xl p-6">
+        <h3 class="text-xl font-bold mb-4">Multiple Batches Found</h3>
+        <p class="mb-4">Select which batch you want to add:</p>
+        
+        <div class="max-h-96 overflow-y-auto">
+          <div 
+            v-for="batch in availableBatches" 
+            :key="batch.id"
+            @click="selectBatch(batch)"
+            class="flex items-center p-4 border border-gray-300 rounded-lg mb-2 cursor-pointer hover:bg-gray-50"
+          >
+            <img 
+              :src="batch.image ? `/${batch.image}` : '/images/placeholder.jpg'" 
+              alt="Product Image" 
+              class="w-16 h-16 object-cover rounded border border-gray-300 mr-4"
+            />
+            <div class="flex-1">
+              <p class="font-semibold text-lg">{{ batch.name }}</p>
+              <div class="flex justify-between text-sm text-gray-600">
+                <span>Batch: {{ batch.batch_no }}</span>
+                <span>Stock: {{ batch.stock_quantity }}</span>
+                <span>Price: {{ batch.selling_price }} LKR</span>
+              </div>
+              <div v-if="batch.expire_date" class="text-sm text-gray-600">
+                Expires: {{ batch.expire_date }}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex justify-end gap-3 mt-4">
+          <button 
+            @click="cancelBatchSelection"
+            class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modals -->
     <PosSuccessModel
       :open="isSuccessModalOpen"
@@ -847,13 +890,7 @@
     </template>
     <!-- /Customer/Orders Modal -->
   </div>
-
-
-  
 </template>
-
-
-
 
 <script setup>
 import { Head, Link, useForm, router } from "@inertiajs/vue3";
@@ -929,6 +966,11 @@ const asideRef = ref(null);
 
 const isCreateModalOpen = ref(false);
 const isServiceModalOpen = ref(false);
+
+// Batch selection variables
+const showBatchSelection = ref(false);
+const availableBatches = ref([]);
+const pendingBarcode = ref("");
 
 const onServiceSaved = (data) => {
   isAlertModalOpen.value = true;
@@ -1312,10 +1354,19 @@ const submitCoupon = async () => {
   }
 };
 
+// Modified submitBarcode function with batch selection
 const submitBarcode = async () => {
   try {
     const response = await axios.post(route("pos.getProduct"), { barcode: form.barcode });
-    const { product: fetchedProduct, error: fetchedError } = response.data;
+    const { product: fetchedProduct, batches: fetchedBatches, error: fetchedError } = response.data;
+
+    if (fetchedBatches && fetchedBatches.length > 1) {
+      // Show batch selection modal
+      pendingBarcode.value = form.barcode;
+      availableBatches.value = fetchedBatches;
+      showBatchSelection.value = true;
+      return;
+    }
 
     if (fetchedProduct) {
       if (fetchedProduct.stock_quantity < 1) {
@@ -1354,6 +1405,36 @@ const submitBarcode = async () => {
     form.barcode = "";
     focusBarcodeField();
   }
+};
+
+// Batch selection functions
+const selectBatch = (batch) => {
+  if (batch.stock_quantity < 1) {
+    isAlertModalOpen.value = true;
+    message.value = "Selected batch is out of stock";
+    cancelBatchSelection();
+    return;
+  }
+
+  const existing = products.value.find((i) => i.id === batch.id);
+  if (existing) existing.quantity += 1;
+  else
+    products.value.push({
+      ...batch,
+      quantity: 1,
+      apply_discount: false,
+    });
+
+  cancelBatchSelection();
+  focusBarcodeField();
+};
+
+const cancelBatchSelection = () => {
+  showBatchSelection.value = false;
+  availableBatches.value = [];
+  pendingBarcode.value = "";
+  form.barcode = "";
+  focusBarcodeField();
 };
 
 // Scanner buffer via keydown (no double typing)
@@ -1814,8 +1895,8 @@ watch(
 );
 
 // Refocus back to barcode when all modals are closed
-watch([isSelectModalOpen, isModalOpen, isCreateModalOpen, isServiceModalOpen, isSuccessModalOpen], ([a,b,c,d,e]) => {
-  if (!a && !b && !c && !d && !e) focusBarcodeField();
+watch([isSelectModalOpen, isModalOpen, isCreateModalOpen, isServiceModalOpen, isSuccessModalOpen, showBatchSelection], ([a,b,c,d,e,f]) => {
+  if (!a && !b && !c && !d && !e && !f) focusBarcodeField();
 });
 
 watch(isReturnBill, (newVal) => {

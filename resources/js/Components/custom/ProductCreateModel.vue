@@ -924,5 +924,62 @@
        }
      }
    });
+
+  watch(() => form.barcode, async (newBarcode) => {
+  if (newBarcode) {
+    try {
+      const response = await axios.get('/products/next-batch-by-barcode', {
+        params: { barcode: newBarcode }
+      });
+      if (response.data?.next_batch_no) {
+        form.batch_no = response.data.next_batch_no;
+      }
+    } catch (error) {
+      console.error('Error fetching next batch number:', error);
+    }
+  } else {
+    // Clear batch number if barcode is empty
+    form.batch_no = '';
+  }
+});
+
+watch(() => form.barcode, async (newBarcode) => {
+  if (newBarcode) {
+    try {
+      // First, fetch next batch number
+      const batchResponse = await axios.get('/products/next-batch-by-barcode', {
+        params: { barcode: newBarcode }
+      });
+      if (batchResponse.data?.next_batch_no) {
+        form.batch_no = batchResponse.data.next_batch_no;
+      }
+
+      // Then, check if product with this barcode exists and fetch details
+      const productResponse = await axios.get('/products/get-by-barcode', {
+        params: { barcode: newBarcode }
+      });
+      
+      if (productResponse.data?.product) {
+        const product = productResponse.data.product;
+        
+        // Auto-fill name and code if they exist
+        if (product.name && !form.name) {
+          form.name = product.name;
+        }
+        if (product.code && !form.code) {
+          form.code = product.code;
+        }
+        
+     
+      }
+    } catch (error) {
+      console.error('Error fetching product details:', error);
+    }
+  } else {
+    // Clear batch number if barcode is empty
+    form.batch_no = '';
+  }
+});
+
    
 </script>

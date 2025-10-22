@@ -58,7 +58,7 @@ class PosController extends Controller
         ]);
     }
 
-    public function getProduct(Request $request)
+  public function getProduct(Request $request)
     {
         if (!Gate::allows('hasRole', ['Admin', 'Cashier'])) {
             abort(403, 'Unauthorized');
@@ -71,22 +71,61 @@ class PosController extends Controller
         $barcodeOrCode = $request->barcode;
 
         // 🔁 First, try to match as a code (to enable FIFO)
-        $product = Product::where('code', $barcodeOrCode)
+        $products = Product::where('code', $barcodeOrCode)
             ->where('stock_quantity', '>', 0)
             ->orderBy('created_at', 'asc') // FIFO
-            ->first();
-
+            ->get();
 
         // 🆘 Fallback: match as unique barcode (not FIFO)
-        if (!$product) {
-            $product = Product::where('barcode', $barcodeOrCode)
+        if ($products->isEmpty()) {
+            $products = Product::where('barcode', $barcodeOrCode)
                 ->where('stock_quantity', '>', 0)
-                ->first();
+                ->get();
+        }
+
+        // If multiple batches found, return all of them
+        if ($products->count() > 1) {
+            return response()->json([
+                'batches' => $products->map(function ($product) {
+                    return [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'batch_no' => $product->batch_no,
+                        'stock_quantity' => $product->stock_quantity,
+                        'selling_price' => $product->selling_price,
+                        'cost_price' => $product->cost_price,
+                        'image' => $product->image,
+                        'expire_date' => $product->expire_date,
+                        'code' => $product->code,
+                        'size_id' => $product->size_id,
+                        'color_id' => $product->color_id,
+                        'category_id' => $product->category_id,
+                        'supplier_id' => $product->supplier_id,
+                        'discount' => $product->discount,
+                        'discounted_price' => $product->discounted_price,
+                        'whole_price' => $product->whole_price,
+                        'wholesale_discount' => $product->wholesale_discount,
+                        'final_whole_price' => $product->final_whole_price,
+                    ];
+                })->toArray(),
+                'product' => null,
+                'error' => null,
+            ]);
+        }
+
+        // If only one product found, return it as before
+        if ($products->count() === 1) {
+            return response()->json([
+                'product' => $products->first(),
+                'batches' => null,
+                'error' => null,
+            ]);
         }
 
         return response()->json([
-            'product' => $product,
-            'error' => $product ? null : 'Product not found',
+            'product' => null,
+            'batches' => null,
+            'error' => 'Product not found',
         ]);
     }
 
@@ -814,5 +853,7 @@ private function upsertCustomerFromArray(array $customerData): ?Customer
 
         return response()->json(['message' => 'Guide marked as completed.']);
     }
+
+    
 
 }
