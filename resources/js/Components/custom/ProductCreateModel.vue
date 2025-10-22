@@ -296,13 +296,18 @@
                               <label class="block text-md font-medium text-gray-300"
                                  >Bar code:</label
                                  >
-                              <input
-                                 v-model="form.barcode"
-                                 type="text"
-                                 id="barcode"
-                                 placeholder="Enter Barcode"
-                                 class="w-full px-4 py-2 mt-2 text-black rounded-md focus:outline-none focus:ring focus:ring-blue-600"
-                                 />
+                              <div class="relative">
+                                 <input
+                                    v-model="form.barcode"
+                                    type="text"
+                                    id="barcode"
+                                    placeholder="Enter Barcode (will auto-fetch product details)"
+                                    class="w-full px-4 py-2 mt-2 text-black rounded-md focus:outline-none focus:ring focus:ring-blue-600"
+                                    />
+                                 <div v-if="isLoadingBarcode" class="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                 </div>
+                              </div>
                               <span
                                  v-if="form.errors.barcode"
                                  class="mt-4 text-red-500"
@@ -704,6 +709,15 @@
    import axios from 'axios';
    import { useForm } from "@inertiajs/vue3";
    
+   // Debounce utility for faster barcode lookup
+   const debounce = (func, delay) => {
+     let timeoutId;
+     return (...args) => {
+       clearTimeout(timeoutId);
+       timeoutId = setTimeout(() => func.apply(null, args), delay);
+     };
+   };
+   
    const emit = defineEmits(["update:open"]);
    
    const isPharma = computed(() => import.meta.env.VITE_APP_NAME === "pharma");
@@ -796,6 +810,7 @@
    };
    
    const successMessage = ref("");
+   const isLoadingBarcode = ref(false);
    
    // Utility function to limit to 2 decimal points
    function limitToTwoDecimals(value) {
@@ -925,61 +940,58 @@
      }
    });
 
-  watch(() => form.barcode, async (newBarcode) => {
-  if (newBarcode) {
+// Fast barcode lookup with debouncing - replaces multiple API calls with one optimized call
+watch(() => form.barcode, debounce(async (newBarcode) => {
+  if (newBarcode && newBarcode.length >= 3) { // Only start checking after 3 characters
+    isLoadingBarcode.value = true; // Show loading state
     try {
-      const response = await axios.get('/products/next-batch-by-barcode', {
-        params: { barcode: newBarcode }
-      });
-      if (response.data?.next_batch_no) {
-        form.batch_no = response.data.next_batch_no;
-      }
-    } catch (error) {
-      console.error('Error fetching next batch number:', error);
-    }
-  } else {
-    // Clear batch number if barcode is empty
-    form.batch_no = '';
-  }
-});
-
-watch(() => form.barcode, async (newBarcode) => {
-  if (newBarcode) {
-    try {
-      // First, fetch next batch number
-      const batchResponse = await axios.get('/products/next-batch-by-barcode', {
-        params: { barcode: newBarcode }
-      });
-      if (batchResponse.data?.next_batch_no) {
-        form.batch_no = batchResponse.data.next_batch_no;
-      }
-
-      // Then, check if product with this barcode exists and fetch details
-      const productResponse = await axios.get('/products/get-by-barcode', {
+      // Use the new fast endpoint that returns everything in one call
+      const response = await axios.get('/products/fast-barcode-search', {
         params: { barcode: newBarcode }
       });
       
-      if (productResponse.data?.product) {
-        const product = productResponse.data.product;
+      if (response.data?.exists && response.data?.product) {
+        const product = response.data.product;
         
-        // Auto-fill name and code if they exist
+        // Auto-fill product details from existing product
         if (product.name && !form.name) {
           form.name = product.name;
         }
         if (product.code && !form.code) {
           form.code = product.code;
         }
-        
-     
+        if (product.category_id && !form.category_id) {
+          form.category_id = product.category_id;
+        }
+        if (product.supplier_id && !form.supplier_id) {
+          form.supplier_id = product.supplier_id;
+        }
+        if (product.size_id && !form.size_id) {
+          form.size_id = product.size_id;
+        }
+        if (product.color_id && !form.color_id) {
+          form.color_id = product.color_id;
+        }
       }
+      
+      // Set the next batch number (always returned from the endpoint)
+      if (response.data?.next_batch_no) {
+        form.batch_no = response.data.next_batch_no;
+      }
+      
     } catch (error) {
       console.error('Error fetching product details:', error);
+      // Fallback to batch1 on error
+      form.batch_no = 'batch1';
+    } finally {
+      isLoadingBarcode.value = false; // Hide loading state
     }
   } else {
-    // Clear batch number if barcode is empty
+    // Clear batch number if barcode is empty or too short
     form.batch_no = '';
+    isLoadingBarcode.value = false;
   }
-});
+}, 300)); // 300ms debounce delay
 
    
 </script>

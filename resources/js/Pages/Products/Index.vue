@@ -121,7 +121,7 @@
                      v-model="search"
                      @input="performSearch"
                      type="text"
-                     placeholder="Search ..."
+                     placeholder="Search by name, code, or barcode..."
                      class="w-full custom-input"
                      />
                </div>

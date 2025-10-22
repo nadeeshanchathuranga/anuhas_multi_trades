@@ -49,6 +49,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/products/next-batch', [ProductController::class, 'getNextBatchNo']);
     Route::get('/products/next-batch-by-barcode', [ProductController::class, 'getNextBatchByBarcode']);
     Route::get('/products/get-by-barcode', [ProductController::class, 'getProductByBarcode']);
+    Route::get('/products/fast-barcode-search', [ProductController::class, 'fastBarcodeSearch']);
     Route::get('/grns/next-batch', [GrnController::class, 'getNextBatchNo']);
     Route::post('/csv-upload', [ProductController::class, 'uploadCsv'])->name('csv.upload');
     Route::resource('products', ProductController::class);

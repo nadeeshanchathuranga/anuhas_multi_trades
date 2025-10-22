@@ -13,6 +13,7 @@ use App\Traits\GeneratesUniqueCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Carbon\Carbon;
 use Illuminate\Validation\Rule;
@@ -53,7 +54,8 @@ public function fetchProducts(Request $request)
         ->when($query, function ($qb) use ($query) {
             $qb->where(function ($sub) use ($query) {
                 $sub->where('products.name', 'like', "%{$query}%")
-                    ->orWhere('products.code', 'like', "%{$query}%");
+                    ->orWhere('products.code', 'like', "%{$query}%")
+                    ->orWhere('products.barcode', 'like', "%{$query}%");
             });
         })
         ->when($selectedColor, function ($qb) use ($selectedColor) {
@@ -121,7 +123,8 @@ public function fetchProducts(Request $request)
             ->whereNotNull('name')
             ->when($query, fn($q) => $q->where(fn($sub) =>
                 $sub->where('name', 'like', "%{$query}%")
-                    ->orWhere('code', 'like', "%{$query}%")))
+                    ->orWhere('code', 'like', "%{$query}%")
+                    ->orWhere('barcode', 'like', "%{$query}%")))
             ->when($selectedColor, fn($q) =>
                 $q->whereHas('color', fn($c) => $c->where('name', $selectedColor)))
             ->when($selectedSize, fn($q) =>
@@ -423,11 +426,13 @@ public function fetchProducts(Request $request)
                 $validated['barcode'] = $this->generateUniqueBarcode();
             }
 
+            // Handle certificate upload
             if ($request->hasFile('certificate')) {
-                $certificatePath = $request->file('certificate')->store('certificates', 'public');
-                $product->certificate_path = $certificatePath;
+                $fileExtension = $request->file('certificate')->getClientOriginalExtension();
+                $fileName = 'certificate_' . date("YmdHis") . '.' . $fileExtension;
+                $path = $request->file('certificate')->storeAs('certificates', $fileName, 'public');
+                $validated['certificate_path'] = 'storage/' . $path;
             }
-
 
             // Create product
             $product = Product::create($validated);
@@ -753,7 +758,7 @@ public function fetchProducts(Request $request)
 
     return response()->json(['next_batch_no' => $nextBatch]);
 }
- public function getProductByBarcode(Request $request)
+    public function getProductByBarcode(Request $request)
     {
         $barcode = $request->input('barcode');
         
@@ -761,22 +766,104 @@ public function fetchProducts(Request $request)
             return response()->json(['error' => 'Barcode is required'], 400);
         }
 
-        // Find the most recent product with this barcode
-        $product = Product::where('barcode', $barcode)
+        // Find the most recent product with this barcode or code
+        // Use select to only fetch needed fields for faster query
+        $product = Product::select(['id', 'name', 'code', 'barcode', 'category_id', 'supplier_id', 'size_id', 'color_id'])
+            ->where('barcode', $barcode)
+            ->orWhere('code', $barcode)
             ->orderBy('created_at', 'desc')
             ->first();
 
         if ($product) {
+            // Get next batch number for this barcode/code
+            $nextBatch = 'batch1'; // default
+            
+            if ($product->barcode) {
+                $latestBatch = Product::where('barcode', $product->barcode)
+                    ->orderBy('created_at', 'desc')
+                    ->pluck('batch_no')
+                    ->filter()
+                    ->map(function ($batch) {
+                        if (preg_match('/batch(\d+)/i', $batch, $matches)) {
+                            return (int) $matches[1];
+                        }
+                        return 0;
+                    })
+                    ->max();
+
+                $nextBatchNumber = ($latestBatch ?? 0) + 1;
+                $nextBatch = 'batch' . $nextBatchNumber;
+            }
+
             return response()->json([
+                'success' => true,
                 'product' => [
                     'name' => $product->name,
                     'code' => $product->code,
-                   
-                ]
+                    'barcode' => $product->barcode,
+                    'category_id' => $product->category_id,
+                    'supplier_id' => $product->supplier_id,
+                    'size_id' => $product->size_id,
+                    'color_id' => $product->color_id,
+                ],
+                'next_batch_no' => $nextBatch
             ]);
         }
 
-        return response()->json(['product' => null]);
+        return response()->json(['success' => false, 'product' => null, 'next_batch_no' => 'batch1']);
+    }
+
+    /**
+     * Fast barcode lookup for product creation - returns everything in one call
+     */
+    public function fastBarcodeSearch(Request $request)
+    {
+        $barcode = $request->input('barcode');
+        
+        if (!$barcode) {
+            return response()->json(['exists' => false, 'next_batch_no' => 'batch1'], 200);
+        }
+
+        // Super fast query - only select necessary fields
+        $product = Product::select(['name', 'code', 'barcode', 'category_id', 'supplier_id', 'size_id', 'color_id'])
+            ->where('barcode', $barcode)
+            ->orWhere('code', $barcode)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($product) {
+            // Get next batch number efficiently
+            $latestBatch = Product::where('barcode', $product->barcode)
+                ->orderBy('created_at', 'desc')
+                ->pluck('batch_no')
+                ->filter()
+                ->map(function ($batch) {
+                    if (preg_match('/batch(\d+)/i', $batch, $matches)) {
+                        return (int) $matches[1];
+                    }
+                    return 0;
+                })
+                ->max();
+
+            $nextBatchNumber = ($latestBatch ?? 0) + 1;
+            $nextBatch = 'batch' . $nextBatchNumber;
+
+            return response()->json([
+                'exists' => true,
+                'product' => [
+                    'name' => $product->name,
+                    'code' => $product->code,
+                    'barcode' => $product->barcode,
+                    'category_id' => $product->category_id,
+                    'supplier_id' => $product->supplier_id,
+                    'size_id' => $product->size_id,
+                    'color_id' => $product->color_id,
+                ],
+                'next_batch_no' => $nextBatch
+            ]);
+        }
+
+        return response()->json(['exists' => false, 'next_batch_no' => 'batch1']);
     }
 
 
