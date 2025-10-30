@@ -8,6 +8,8 @@ use App\Models\Cheque;
 use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\Printout;
+use App\Models\CustomProduct;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\ReturnItem;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class PosController extends Controller
 {
@@ -31,7 +34,7 @@ class PosController extends Controller
         }
 
         $allcategories = Category::with('parent')->get()->map(function ($category) {
-            $category->hierarchy_string = $category->hierarchy_string; // Access it
+            $category->hierarchy_string = $category->name; // Corrected assignment
             return $category;
         });
         $sales = Sale::with('customer','employee')->get();
@@ -236,7 +239,10 @@ public function submit(Request $request)
     // ---- VALIDATION ----
     $validated = $request->validate([
         'products' => 'required|array|min:1',
-        'products.*.id' => 'required|integer|exists:products,id',
+        'products.*.id' => 'nullable|integer',
+        'products.*.type' => 'nullable|string|in:product,printout,custom',
+        'products.*.name' => 'required_if:products.*.type,custom|string|max:255',
+        'products.*.price' => 'required_if:products.*.type,custom|numeric|min:0',
         'products.*.quantity' => 'required|numeric|min:0.01',
         // Optional/overrides coming from UI
         'products.*.unit_price' => 'nullable|numeric|min:0',
@@ -294,45 +300,93 @@ public function submit(Request $request)
     $totalCost   = 0.0;
 
     foreach ($products as &$p) {
-        /** @var \App\Models\Product $productModel */
-        $productModel = Product::find($p['id']);
-        if (!$productModel) {
-            return response()->json(['message' => "Product with ID {$p['id']} not found"], 404);
+        $itemType = $p['type'] ?? 'product';
+        
+        if ($itemType === 'custom') {
+            // Handle custom product items (no stock check, no existing record)
+            $qty = (float)($p['quantity'] ?? 0);
+            
+            // Use the price provided from frontend
+            $unitPrice = (float)($p['price'] ?? 0);
+            $costPrice = 0; // Custom products don't have cost price
+            
+            $p['__resolved_unit_price'] = $unitPrice;
+            $p['__resolved_cost_price'] = $costPrice;
+            $p['__is_custom'] = true;
+            $p['__custom_name'] = $p['name'] ?? 'Custom Product';
+            
+            $totalAmount += $qty * $unitPrice;
+            $totalCost   += $qty * $costPrice;
+            
+        } elseif ($itemType === 'printout') {
+            // Handle printout items
+            $printoutModel = Printout::find($p['id']);
+            if (!$printoutModel) {
+                return response()->json(['message' => "Printout with ID {$p['id']} not found"], 404);
+            }
+
+            $qty = (float)($p['quantity'] ?? 0);
+
+            // Stock availability for printouts - UNLIMITED (no check)
+            // Printouts have unlimited stock, no validation needed
+
+            // Use printout price
+            $unitPrice = isset($p['unit_price']) && $p['unit_price'] > 0
+                ? (float)$p['unit_price']
+                : (float)($printoutModel->price ?? 0);
+
+            $costPrice = 0; // Printouts don't have cost price
+
+            $p['__resolved_unit_price'] = $unitPrice;
+            $p['__resolved_cost_price'] = $costPrice;
+            $p['__model'] = $printoutModel;
+            $p['name'] = $printoutModel->name; // Include printout name
+
+            $totalAmount += $qty * $unitPrice;
+            $totalCost   += $qty * $costPrice;
+        } else {
+            // Handle regular product items
+            /** @var \App\Models\Product $productModel */
+            $productModel = Product::find($p['id']);
+            if (!$productModel) {
+                return response()->json(['message' => "Product with ID {$p['id']} not found"], 404);
+            }
+
+            $qty = (float)($p['quantity'] ?? 0);
+
+            // Stock availability
+            if ($productModel->stock_quantity < $qty) {
+                return response()->json([
+                    'message' => "Insufficient stock for {$productModel->name}. Available: {$productModel->stock_quantity}, Requested: {$qty}"
+                ], 423);
+            }
+
+            // Expiry check
+            if ($productModel->expire_date && now()->greaterThan($productModel->expire_date)) {
+                $expireDate = \Carbon\Carbon::parse($productModel->expire_date)->format('Y-m-d');
+                return response()->json([
+                    'message' => "Product '{$productModel->name}' expired on {$expireDate}."
+                ], 423);
+            }
+
+            // Resolve unit price (UI override > whole/sell fallback)
+            $unitPrice = isset($p['unit_price']) && $p['unit_price'] > 0
+                ? (float)$p['unit_price']
+                : (float)($isWhole
+                    ? ($productModel->whole_price ?? $productModel->selling_price ?? 0)
+                    : ($productModel->selling_price ?? $productModel->whole_price ?? 0));
+
+            $costPrice = isset($p['cost_price']) && $p['cost_price'] > 0
+                ? (float)$p['cost_price']
+                : (float)($productModel->cost_price ?? 0);
+
+            $p['__resolved_unit_price'] = $unitPrice;
+            $p['__resolved_cost_price'] = $costPrice;
+            $p['__model'] = $productModel;
+
+            $totalAmount += $qty * $unitPrice;
+            $totalCost   += $qty * $costPrice;
         }
-
-        $qty = (float)($p['quantity'] ?? 0);
-
-        // Stock availability
-        if ($productModel->stock_quantity < $qty) {
-            return response()->json([
-                'message' => "Insufficient stock for {$productModel->name}. Available: {$productModel->stock_quantity}, Requested: {$qty}"
-            ], 423);
-        }
-
-        // Expiry check
-        if ($productModel->expire_date && now()->greaterThan($productModel->expire_date)) {
-            $expireDate = \Carbon\Carbon::parse($productModel->expire_date)->format('Y-m-d');
-            return response()->json([
-                'message' => "Product '{$productModel->name}' expired on {$expireDate}."
-            ], 423);
-        }
-
-        // Resolve unit price (UI override > whole/sell fallback)
-        $unitPrice = isset($p['unit_price']) && $p['unit_price'] > 0
-            ? (float)$p['unit_price']
-            : (float)($isWhole
-                ? ($productModel->whole_price ?? $productModel->selling_price ?? 0)
-                : ($productModel->selling_price ?? $productModel->whole_price ?? 0));
-
-        $costPrice = isset($p['cost_price']) && $p['cost_price'] > 0
-            ? (float)$p['cost_price']
-            : (float)($productModel->cost_price ?? 0);
-
-        $p['__resolved_unit_price'] = $unitPrice;
-        $p['__resolved_cost_price'] = $costPrice;
-
-        $totalAmount += $qty * $unitPrice;
-        $totalCost   += $qty * $costPrice;
     }
     unset($p);
 
@@ -424,28 +478,68 @@ public function submit(Request $request)
 
         // ---- SALE ITEMS & STOCK MOVES ----
         foreach ($products as $p) {
-            $productModel = Product::find($p['id']);
-            $qty       = (float)$p['quantity'];
+            $itemType = $p['type'] ?? 'product';
+            $qty = (float)$p['quantity'];
             $unitPrice = (float)$p['__resolved_unit_price'];
+            
+            if ($itemType === 'custom') {
+                // Handle custom product sale item
+                // First, create the custom product record
+                $customProduct = CustomProduct::create([
+                    'name' => $p['__custom_name'],
+                    'price' => $unitPrice,
+                ]);
+                
+                SaleItem::create([
+                    'sale_id'           => $sale->id,
+                    'product_id'        => null,
+                    'printout_id'       => null,
+                    'custom_product_id' => $customProduct->id,
+                    'quantity'          => $qty,
+                    'unit_price'        => $unitPrice,
+                    'total_price'       => $qty * $unitPrice,
+                ]);
+                
+                // No stock to decrement for custom products
+                
+            } elseif ($itemType === 'printout') {
+                // Handle printout sale item
+                $printoutModel = $p['__model'];
+                
+                SaleItem::create([
+                    'sale_id'     => $sale->id,
+                    'product_id'  => null,
+                    'printout_id' => $printoutModel->id,
+                    'quantity'    => $qty,
+                    'unit_price'  => $unitPrice,
+                    'total_price' => $qty * $unitPrice,
+                ]);
 
-            SaleItem::create([
-                'sale_id'     => $sale->id,
-                'product_id'  => $productModel->id,
-                'quantity'    => $qty,
-                'unit_price'  => $unitPrice,
-                'total_price' => $qty * $unitPrice,
-            ]);
+                // Printout stock is unlimited - no decrement needed
+                // $printoutModel->decrement('quantity', $qty);
+            } else {
+                // Handle regular product sale item
+                $productModel = $p['__model'];
 
-            StockTransaction::create([
-                'product_id'        => $productModel->id,
-                'sale_id'           => $sale->id,
-                'transaction_type'  => 'Sold',
-                'quantity'          => $qty,
-                'transaction_date'  => now(),
-                'supplier_id'       => $productModel->supplier_id ?? null,
-            ]);
+                SaleItem::create([
+                    'sale_id'     => $sale->id,
+                    'product_id'  => $productModel->id,
+                    'quantity'    => $qty,
+                    'unit_price'  => $unitPrice,
+                    'total_price' => $qty * $unitPrice,
+                ]);
 
-            $productModel->decrement('stock_quantity', $qty);
+                StockTransaction::create([
+                    'product_id'        => $productModel->id,
+                    'sale_id'           => $sale->id,
+                    'transaction_type'  => 'Sold',
+                    'quantity'          => $qty,
+                    'transaction_date'  => now(),
+                    'supplier_id'       => $productModel->supplier_id ?? null,
+                ]);
+
+                $productModel->decrement('stock_quantity', $qty);
+            }
         }
 
          foreach ($returnItems as $item) {

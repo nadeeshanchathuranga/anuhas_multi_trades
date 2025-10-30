@@ -59,6 +59,23 @@
       </div>
       </Link>
 
+      <Link href="/printouts" v-if="HasRole(['Admin', 'Manager'])">
+      <div class="dashboard-card bg-[#af50eb]">
+        <div class="card-content">
+          <div class="icon-container">
+            <img src="/images/dashboard/printout.png" class="icon" alt="jaan-pos" />
+          </div>
+          <div class="text-container">
+            <p class="title">Printouts</p>
+            <p class="description">
+              Add, update, and manage product details, including pricing and
+              stock levels.
+            </p>
+          </div>
+        </div>
+      </div>
+      </Link>
+
       <Link href="/suppliers" v-if="HasRole(['Admin', 'Manager'])">
       <div class="dashboard-card bg-[#914F1E]">
         <div class="card-content">

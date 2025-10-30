@@ -24,8 +24,12 @@ use App\Http\Controllers\ExpenseNewController;
 use App\Http\Controllers\CreditController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PrintoutController;
+use App\Http\Controllers\InCashController;
+
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Gate;
+
 
 Route::get('/dashboard', function () {
     return Inertia::location(route('dashboard'));
@@ -75,7 +79,10 @@ Route::post('/service/submit', [PosController::class, 'serviceSubmit'])
 
 
     Route::resource('payment', PaymentController::class);
+
+   
     Route::resource('reports', ReportController::class);
+   
     Route::get('/batch-management/search', [ReportController::class, 'searchByCode']);
     Route::resource('customers', CustomerController::class);
     Route::resource('colors', ColorController::class);
@@ -103,15 +110,33 @@ Route::post('/service/submit', [PosController::class, 'serviceSubmit'])
     Route::post('/api/sale/items', [ReturnItemController::class, 'fetchSaleItems'])->name('sale.items');
 
     // Expenses
-Route::resource('units', UnitController::class);
-
     Route::resource('expenses', ExpenseNewController::class);
+    
+    Route::resource('units', UnitController::class);
+
+    
 
     Route::get('/credit_payment/{sale_id}/fetch', [CreditController::class, 'fetchSalePayments'])
         ->name('CreditPayment.fetch');
     Route::resource('credit_payment', CreditController::class);
 
-Route::resource('users', UserController::class); 
+    Route::resource('users', UserController::class); 
+
+    // API route for printouts modal - MUST be before resource route
+    Route::get('/printouts/api', [PrintoutController::class, 'apiIndex'])->name('printouts.api');
+
+    // Test route to verify API response
+    Route::get('/test/printouts', function() {
+        $printouts = \App\Models\Printout::all();
+        return response()->json([
+            'data' => $printouts,
+            'count' => $printouts->count()
+        ]);
+    });
+
+    Route::resource('printouts', PrintoutController::class);
+
+    Route::resource('in-cash', InCashController::class);
 
 
 });

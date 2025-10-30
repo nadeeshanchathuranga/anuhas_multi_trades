@@ -98,11 +98,6 @@
               <!-- Modal Buttons -->
               <div class="mt-6 space-x-4">
                 <button
-                  @click="
-                    () => {
-                      playClickSound();
-                    }
-                  "
                   class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700"
                   type="submit"
                 >
@@ -111,7 +106,6 @@
                 <button
                   @click="
                     () => {
-                      playClickSound();
                       emit('update:open', false);
                     }
                   "
@@ -139,11 +133,6 @@ import {
 } from "@headlessui/vue";
 import { ref } from "vue";
 import { useForm } from "@inertiajs/vue3";
-
-const playClickSound = () => {
-  const clickSound = new Audio("/sounds/click-sound.mp3");
-  clickSound.play();
-};
 
 const emit = defineEmits(["update:open"]);
 

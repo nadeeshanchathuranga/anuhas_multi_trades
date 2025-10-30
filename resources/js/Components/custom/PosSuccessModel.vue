@@ -170,13 +170,15 @@ const handlePrintReceipt = () => {
     .toFixed(2);
 
   const total = subTotal - Number(totalDiscount) - customDiscount;
+  
+  const totalProductCount = props.products.length;
 
   const productRows = props.products
-    .map((product) => {
+    .map((product, index) => {
       return `
         <tr>
           <td colspan="3" style="padding: 4px 0; font-weight: bold;">
-            ${product.name}
+            ${index + 1}. ${product.name}
           </td>
         </tr>
         <tr style="border-bottom: 1px dashed #999;">
@@ -298,6 +300,9 @@ const handlePrintReceipt = () => {
     </div>
 
     <div class="section">
+      <div style="margin-bottom: 8px; font-weight: bold; font-size: 13px;">
+        Total Products: ${totalProductCount}
+      </div>
       <table>
         <thead>
           <tr style="border-bottom:1px solid black;">

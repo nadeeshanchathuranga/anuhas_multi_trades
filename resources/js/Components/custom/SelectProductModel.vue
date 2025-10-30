@@ -54,7 +54,7 @@
                   @change="() => fetchProducts()"
                   class="px-6 py-3 text-xl font-normal tracking-wider text-blue-600 bg-white rounded-lg cursor-pointer custom-select"
                 >
-                  <option value="">Filter by Category</option>
+                  <option value="">Filter by Category1</option>
                   <option
                     v-for="category in allcategories"
                     :key="category.id"
