@@ -31,7 +31,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import CreatePrintoutModal from '@/Components/CreatePrintoutModal.vue';
+
 
 const printouts = ref([]);
 const isCreateModalOpen = ref(false);
