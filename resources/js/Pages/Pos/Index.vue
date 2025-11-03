@@ -2,7 +2,7 @@
   <Head title="POS" />
 
   <!-- Shortcut Keys Flex Row -->
-  <ul class="flex flex-wrap justify-center gap-2 p-4 text-gray-800 bg-yellow-50 border-l-4 border-yellow-500  rounded-lg">
+  <!-- <ul class="flex flex-wrap justify-center gap-2 p-4 text-gray-800 bg-yellow-50 border-l-4 border-yellow-500  rounded-lg">
     <li class="flex items-center gap-2">
       <span class="font-mono font-bold bg-green-200 text-green-900 px-3 py-1 rounded-md">Fn + F1</span>
       <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Add Service</span>
@@ -36,12 +36,13 @@
       <span class="font-mono font-bold bg-red-900 text-white px-3 py-1 rounded-md">Delete</span>
       <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Focus Close</span>
     </li>
-  </ul>
-
+  </ul> -->
+ 
   <div
-    class="flex flex-col items-center justify-start h-screen  space-y-3 bg-gray-100 md:px-20 px-4 overflow-auto text-[1.06rem] leading-relaxed selection:bg-yellow-200"
+    class="flex flex-col items-center justify-start min-h-screen py-8 space-y-8 bg-gray-100 md:px-36 px-16"
   >
-    <div class="w-full md:w-5/6  ">
+    <Header class="mb-8" />
+    <div class="w-full md:w-5/6">
       <div class="flex flex-col w-full gap-5 md:flex-row">
         <div class="flex w-full p-5 border-2 border-black rounded-2xl bg-white shadow-sm">
           <div class="flex flex-col items-start justify-center w-full md:px-8 px-2 gap-5">
@@ -227,6 +228,13 @@
                       <p class="text-xl text-gray-900 font-semibold">
                         {{ item.name }}
                       </p>
+                      <!-- Product Information -->
+                      <template v-if="!item.type || item.type === 'product'">
+                        <p class="text-sm text-gray-600">
+                          Stock: {{ item.stock_quantity || 0 }}  | Price: {{ item.cost_price || 0 }} LKR
+                        </p>
+                      </template>
+                      
 
                       <div class="flex items-center justify-between w-full">
                         <div class="flex items-center gap-2">
@@ -288,7 +296,7 @@
                             </p>
 
                             <p class="text-xl font-bold text-gray-900 mt-1">
-                              {{ isWholesale ? item.whole_price : item.selling_price }} LKR
+                              {{ isWholesale ? Number(item.whole_price).toFixed(2) : Number(item.selling_price).toFixed(2) }} LKR
                             </p>
                           </div>
                         </div>
@@ -1021,6 +1029,7 @@ import SelectProductModel from "@/Components/custom/SelectProductModel.vue";
 import ExpenseCreateModal from "@/Components/custom/ExpenseCreateModal.vue";
 import ServiceQuickModal from "@/Components/custom/ServiceQuickModal.vue";
 import PrintoutSelectorModal from '@/Components/custom/PrintoutSelectorModal.vue';
+import Header from "@/Components/custom/Header.vue";
 
 import { generateOrderId } from "@/Utils/Other.js";
 
@@ -1977,6 +1986,7 @@ const handlePrintoutsSelected = (selectedPrintouts) => {
       id: printout.id,
       type: 'printout',
       name: printout.name || 'Unnamed Printout',
+
       price: parseFloat(printout.price),
            quantity: parseInt(printout.quantity),
       selling_price: parseFloat(printout.price),

@@ -174,36 +174,34 @@ const handlePrintReceipt = () => {
   const totalProductCount = props.products.length;
 
   const productRows = props.products
-    .map((product, index) => {
-      return `
-        <tr>
-          <td colspan="3" style="padding: 4px 0; font-weight: bold;">
-            ${index + 1}. ${product.name}
-          </td>
-        </tr>
-        <tr style="border-bottom: 1px dashed #999;">
-          <td></td>
-          <td style="text-align: center; padding: 2px 0;">
-            ${product.selling_price} × ${product.quantity}
-            ${
-              product.discount > 0 && product.apply_discount
-                ? `<div style="font-weight: bold; font-size: 9px; background:black; color:white; text-align:center; margin-top:2px; border-radius:3px; display:inline-block; padding:0 4px;">
-                     ${product.discount}% OFF
-                   </div>`
-                : ""
-            }
-          </td>
-          <td style="text-align: right; padding: 2px 0;">
-            ${
-              product.discount > 0 && product.apply_discount
-                ? (product.selling_price * product.quantity * (1 - product.discount / 100)).toFixed(2)
-                : (product.selling_price * product.quantity).toFixed(2)
-            }
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+  .map((product, index) => {
+    return `
+      <tr>
+        <td style="text-align: left; padding: 4px 0; font-weight: bold; width: 40%; font-size: 10px;">${index + 1}. ${product.name}</td>
+        <td style="text-align: center; padding: 4px 0; font-weight: bold; width: 15%; font-size: 10px;">${product.quantity}</td>
+        <td style="text-align: center; padding: 4px 0; font-weight: bold; width: 20%; font-size: 10px;">${Number(product.selling_price).toFixed(2)}</td>
+        <td style="text-align: right; padding: 4px 0; font-weight: bold; width: 25%; font-size: 10px;">
+          ${
+            product.discount > 0 && product.apply_discount
+              ? (product.selling_price * product.quantity * (1 - product.discount / 100)).toFixed(2)
+              : (product.selling_price * product.quantity).toFixed(2)
+          }
+        </td>
+      </tr>
+      ${
+        product.discount > 0 && product.apply_discount
+          ? `<tr>
+               <td colspan="4" style="text-align: center; padding: 2px 0;">
+                 <div style="font-weight: bold; font-size: 9px; background:black; color:white; text-align:center; border-radius:3px; display:inline-block; padding:1px 6px;">
+                   ${product.discount}% OFF
+                 </div>
+               </td>
+             </tr>`
+          : ""
+      }
+    `;
+  })
+  .join("");
 
   const receiptHTML = `
 <!DOCTYPE html>
@@ -300,15 +298,16 @@ const handlePrintReceipt = () => {
     </div>
 
     <div class="section">
-      <div style="margin-bottom: 8px; font-weight: bold; font-size: 13px;">
+      <div style="margin-bottom: 8px; font-weight: bold; font-size: 10px;">
         Total Products: ${totalProductCount}
       </div>
       <table>
         <thead>
-          <tr style="border-bottom:1px solid black;">
-            <th style="text-align:left; padding:4px;">Items</th>
-            <th style="text-align:center; padding:4px;">Price × Qty</th>
-            <th style="text-align:right; padding:4px;">Total</th>
+            <tr style="border-bottom:1px solid black;">
+      <th style="text-align:left; padding:4px; width:40%;">Item</th>
+      <th style="text-align:center; padding:4px; width:15%;">Qty</th>
+      <th style="text-align:center; padding:4px; width:20%;">Price</th>
+      <th style="text-align:right; padding:4px; width:25%;">Amount</th>
           </tr>
         </thead>
         <tbody>

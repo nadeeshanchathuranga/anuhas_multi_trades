@@ -12,15 +12,26 @@ class PrintoutController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
-    {
-        $printouts = Printout::latest()->paginate(12);
-        
-        return Inertia::render('Printouts/Index', [
-            'printouts' => $printouts,
-            'totalPrintouts' => Printout::count(),
-        ]);
+    /**
+ * Display a listing of the resource.
+ */
+public function index(Request $request)
+{
+    $query = Printout::query();
+
+    // Add search functionality to the main index method
+    if ($request->filled('search')) {
+        $query->where('name', 'like', '%' . $request->search . '%');
     }
+
+    $printouts = $query->latest()->paginate(12);
+    
+    return Inertia::render('Printouts/Index', [
+        'printouts' => $printouts,
+        'totalPrintouts' => Printout::count(),
+        'search' => $request->search, // Pass search term back to frontend
+    ]);
+}
 
     /**
      * Show the form for creating a new resource.
@@ -108,40 +119,41 @@ class PrintoutController extends Controller
     /**
      * API endpoint for fetching printouts (for POS modal)
      */
-    public function apiIndex(Request $request)
-    {
-        $query = Printout::query();
+    /**
+ * API endpoint for fetching printouts (for POS modal)
+ */
+public function apiIndex(Request $request)
+{
+    $query = Printout::query();
 
-        // Search filter
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        // Stock filter
-        if ($request->filled('stock') && $request->stock !== 'all') {
-            if ($request->stock === 'in') {
-                $query->where('stock_quantity', '>', 0);
-            } elseif ($request->stock === 'out') {
-                $query->where('stock_quantity', '<=', 0);
-            }
-        }
-
-        // Sort by price
-        if ($request->filled('sort')) {
-            $query->orderBy('price', $request->sort);
-        } else {
-            $query->latest();
-        }
-
-        $printouts = $query->get();
-
-        return response()->json([
-            'data' => $printouts,
-            'count' => $printouts->count()
-        ]);
+    // Search filter - UPDATED: search by name only
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where('name', 'like', "%{$search}%");
     }
+
+    // Stock filter
+    if ($request->filled('stock') && $request->stock !== 'all') {
+        if ($request->stock === 'in') {
+            $query->where('stock_quantity', '>', 0);
+        } elseif ($request->stock === 'out') {
+            $query->where('stock_quantity', '<=', 0);
+        }
+    }
+
+    // Sort by price
+    if ($request->filled('sort')) {
+        $query->orderBy('price', $request->sort);
+    } else {
+        $query->latest();
+    }
+
+    $printouts = $query->get();
+
+    return response()->json([
+        'data' => $printouts,
+        'count' => $printouts->count()
+    ]);
+}
+
 }
