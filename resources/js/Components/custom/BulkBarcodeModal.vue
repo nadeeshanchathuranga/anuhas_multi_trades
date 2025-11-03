@@ -281,6 +281,17 @@ const generateBarcodes = async () => {
         overflow: hidden;
       }
 
+      .store-name {
+        font-size: 7px;
+        font-weight: bold;
+        line-height: 1;
+        margin-bottom: 0.5mm;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100%;
+      }
+
       .product-name {
         font-size: 9px;
         font-weight: bold;
@@ -369,6 +380,7 @@ const generateBarcodes = async () => {
                   <div class="barcode-svg">
                     <svg id="barcode-${product.id}"></svg>
                   </div>
+                  <div class="store-name">Anuhas M/T</div>
                   <div class="bottom-info">
                     <span>${escapeHtml(product.code)}</span>
                     <span>Rs:${parseFloat(product.selling_price || 0).toFixed(2)}</span>

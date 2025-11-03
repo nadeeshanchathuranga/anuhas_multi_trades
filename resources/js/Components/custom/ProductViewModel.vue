@@ -258,6 +258,7 @@ function generateAndPrintBarcodes() {
     <div class="barcode-label">
       <div class="product-name">${selectedProduct?.code || 'N/A'}</div>
       <div class="barcode-svg"><svg id="barcode${idx + 1}"></svg></div>
+      <div class="store-name">Anuhas M/T</div>
       <div class="bottom-info">${(selectedProduct?.selling_price ?? 'N/A')} LKR</div>
     </div>
   `).join('');
@@ -294,6 +295,20 @@ function generateAndPrintBarcodes() {
           justify-content: center;
           overflow: hidden;
           margin: 0;
+        }
+
+        .store-name {
+          font-size: 7px;
+          font-weight: 700;
+          line-height: 1;
+          width: 100%;
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin: 0;
+          padding: 0;
+          margin-bottom: 0.5mm;
         }
 
         .product-name {
