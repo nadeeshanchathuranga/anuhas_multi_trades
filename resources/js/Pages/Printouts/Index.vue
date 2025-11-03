@@ -189,7 +189,10 @@ const performSearch = debounce(() => {
   router.get(
     route("printouts.index"),
     { search: search.value },
-    { preserveState: true }
+    { preserveState: true,
+      replace: true,
+      only: ['printouts', 'search']
+     }
   );
 }, 500);
 

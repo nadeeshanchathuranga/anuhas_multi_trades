@@ -116,9 +116,9 @@
                     <div class="space-y-3">
                       <!-- Header -->
                       <div class="flex justify-between items-start">
-                        <h3 class="font-semibold text-gray-800 text-lg line-clamp-2">
+                        <h1 class="font-semibold text-gray-800 text-lg line-clamp-2">
                           {{ printout.title }}
-                        </h3>
+                        </h1>
                         <span
                           class="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800"
                         >
@@ -127,9 +127,9 @@
                       </div>
 
                       <!-- Description -->
-                      <p class="text-black-600  line-clamp-2">
+                      <h1 class="text-black  text-2xl line-clamp-2">
                         {{ printout.name || 'No name' }}
-                      </p>
+                      </h1>
 
                       <!-- Price and Stock -->
                       <div class="flex justify-between items-center">
