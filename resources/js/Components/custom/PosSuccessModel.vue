@@ -293,7 +293,7 @@ const handlePrintReceipt = () => {
 
     <div class="info-row">
       <p>Billing Type: <small>${props.isWholesale ? "Wholesale" : "Retail"}</small></p>
-      ${props.paymentMethod === "online" ? `<p>Payment Method: <small>Cheque</small></p>` : ""}
+      <p>Payment: <small>${props.paymentMethod === "online" ? "Cheque" : (props.paymentMethod || "Cash")}</small></p>
       <p>Credit Bill: <small>${props.credit_bill ? "Yes" : "No"}</small></p>
     </div>
 
