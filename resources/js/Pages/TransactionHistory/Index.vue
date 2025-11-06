@@ -401,7 +401,7 @@ const printReceipt = (history) => {
   const items = history.sale_items || [];
 
   const productRows = (items).map((it) => {
-    const name = it?.product?.name || it?.name || "N/A";
+    const name = it?.product?.name || it?.custom_product?.name || it?.printout?.name || it?.name || "N/A";
     const qty = Number(it.quantity || 0);
     const unit = computePrice(it);
     const pct = Number(it.discount ?? it.discount_percent ?? 0);
