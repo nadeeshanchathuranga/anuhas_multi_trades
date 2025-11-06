@@ -1,43 +1,6 @@
 <template>
   <Head title="POS" />
 
-  <!-- Shortcut Keys Flex Row -->
-  <!-- <ul class="flex flex-wrap justify-center gap-2 p-4 text-gray-800 bg-yellow-50 border-l-4 border-yellow-500  rounded-lg">
-    <li class="flex items-center gap-2">
-      <span class="font-mono font-bold bg-green-200 text-green-900 px-3 py-1 rounded-md">Fn + F1</span>
-      <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Add Service</span>
-    </li>
-    <li class="flex items-center gap-2">
-      <span class="font-mono font-bold bg-blue-200 text-blue-900 px-3 py-1 rounded-md">Fn + F2</span>
-      <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Add Expense</span>
-    </li>
-    <li class="flex items-center gap-2">
-      <span class="font-mono font-bold bg-purple-200 text-purple-900 px-3 py-1 rounded-md">Fn + F3</span>
-      <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">User Manual</span>
-    </li>
-    <li class="flex items-center gap-2">
-      <span class="font-mono font-bold bg-pink-200 text-pink-900 px-3 py-1 rounded-md">Fn + F4</span>
-      <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Orders & Customer</span>
-    </li>
-
-    <li class="flex items-center gap-2">
-      <span class="font-mono font-bold bg-orange-200 text-pink-900 px-3 py-1 rounded-md">Fn + F5</span>
-      <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Orders & Customer</span>
-    </li>
-
-
-    <li class="flex items-center gap-2">
-      <span class="font-mono font-bold bg-amber-200 text-amber-900 px-3 py-1 rounded-md">Fn + Shift</span>
-      <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Focus Custom Discount</span>
-    </li>
-
-
-        <li class="flex items-center gap-2">
-      <span class="font-mono font-bold bg-red-900 text-white px-3 py-1 rounded-md">Delete</span>
-      <span class="text-xl font-bold tracking-wide text-gray-900 md:text-left ml-auto">Focus Close</span>
-    </li>
-  </ul> -->
- 
   <div
     class="flex flex-col items-center justify-start min-h-screen py-8 space-y-8 bg-gray-100 md:px-36 px-16"
   >
@@ -46,8 +9,6 @@
       <div class="flex flex-col w-full gap-5 md:flex-row">
         <div class="flex w-full p-5 border-2 border-black rounded-2xl bg-white shadow-sm">
           <div class="flex flex-col items-start justify-center w-full md:px-8 px-2 gap-5">
-         
-
             <!-- Top Controls -->
             <div class="flex flex-col md:flex-row md:items-center md:justify-between w-full gap-3">
               <!-- Left -->
@@ -88,7 +49,6 @@
 
               <!-- Right -->
               <div class="flex flex-wrap items-center gap-3 justify-end w-full md:w-auto">
-                
                 <button
                   @click="openCustomProductModal"
                   class="flex items-center px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition text-white text-xl font-semibold"
@@ -125,10 +85,7 @@
                   Add Expense
                 </button>
 
-
- 
-
-     <button
+                <button
                   @click="openReturnBills"
                   class="flex items-center px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition text-white text-xl font-semibold"
                   title="Add a new expense"
@@ -136,9 +93,6 @@
                   <i class="ri-add-circle-fill mr-2"></i>
                   Return Bills
                 </button>
-
-
-
 
                 <button
                   @click="isSelectModalOpen = true"
@@ -225,16 +179,26 @@
                     </div>
 
                     <div class="flex flex-col justify-between w-5/6 gap-2">
-                      <p class="text-xl text-gray-900 font-semibold">
-                        {{ item.name }}
+                      <!-- Name + Custom checkbox + price -->
+                      <p class="flex items-center justify-between text-gray-900 font-semibold gap-3">
+                        <span class="text-lg truncate">{{ item.name }}</span>
+
+                        <label class="flex items-center gap-2 select-none">
+                          <input
+                            type="checkbox"
+                            v-model="item.include_custom"
+                            class="h-5 w-5 text-blue-600 border-black rounded focus:ring-indigo-500"
+                            :aria-label="`Include ${item.name} for custom discount`"
+                          />
+                          <span class="text-xs text-gray-600">Custom</span>
+                        </label>
+
+                        <span class="text-lg text-blue-900 font-extrabold">
+                          {{ isWholesale ? Number(item.whole_price).toFixed(2) : Number(item.selling_price).toFixed(2) }} LKR
+                        </span>
                       </p>
-                      <!-- Product Information -->
-                      <template v-if="!item.type || item.type === 'product'">
-                        <p class="text-sm text-gray-600">
-                          Stock: {{ item.stock_quantity || 0 }}  | Price: {{ item.cost_price || 0 }} LKR
-                        </p>
-                      </template>
-                      
+
+                     
 
                       <div class="flex items-center justify-between w-full">
                         <div class="flex items-center gap-2">
@@ -296,7 +260,7 @@
                             </p>
 
                             <p class="text-xl font-bold text-gray-900 mt-1">
-                              {{ isWholesale ? Number(item.whole_price).toFixed(2) : Number(item.selling_price).toFixed(2) }} LKR
+                              {{ ((isWholesale ? item.whole_price : item.selling_price) * item.quantity).toFixed(2) }} LKR
                             </p>
                           </div>
                         </div>
@@ -386,7 +350,12 @@
                   </div>
 
                   <div class="flex items-center justify-between border-b border-gray-300 pb-3">
-                    <p class="text-xl font-medium text-gray-800">Custom Discount</p>
+                    <p class="text-xl font-medium text-gray-800">
+                      Custom Discount
+                      <span class="ml-2 text-sm text-gray-500">
+                        (on {{ products.filter(p => p.include_custom).length }} items)
+                      </span>
+                    </p>
                     <div class="flex items-center gap-2">
                       <CurrencyInput
                         ref="customDiscountRef"
@@ -582,22 +551,21 @@
                 <!-- Confirm -->
                 <div class="w-full">
                   <button
-  ref="confirmButtonRef"
-  @click="selectedOrder?.order_id ? updateOrder() : submitOrder()"
-  type="button"
-  :disabled="products.length === 0 && services.length === 0"
-  :class="[
-    'w-full bg-black py-3 text-xl font-bold tracking-wide text-white uppercase rounded-lg transition flex items-center justify-center gap-3',
-    (products.length === 0 && services.length === 0)
-      ? 'opacity-50 cursor-not-allowed'
-      : 'hover:bg-gray-800 focus:bg-blue-600'
-  ]"
-  tabindex="2"
->
-  <i class="ri-add-circle-fill"></i>
-  {{ selectedOrder?.order_id ? 'Update Order' : 'Confirm Order' }}
-</button>
-
+                    ref="confirmButtonRef"
+                    @click="selectedOrder?.order_id ? updateOrder() : submitOrder()"
+                    type="button"
+                    :disabled="products.length === 0 && services.length === 0"
+                    :class="[
+                      'w-full bg-black py-3 text-xl font-bold tracking-wide text-white uppercase rounded-lg transition flex items-center justify-center gap-3',
+                      (products.length === 0 && services.length === 0)
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:bg-gray-800 focus:bg-blue-600'
+                    ]"
+                    tabindex="2"
+                  >
+                    <i class="ri-add-circle-fill"></i>
+                    {{ selectedOrder?.order_id ? 'Update Order' : 'Confirm Order' }}
+                  </button>
                 </div>
               </aside>
             </div>
@@ -611,17 +579,17 @@
       <div class="bg-white rounded-2xl w-full max-w-2xl p-6">
         <h3 class="text-xl font-bold mb-4">Multiple Batches Found</h3>
         <p class="mb-4">Select which batch you want to add:</p>
-        
+
         <div class="max-h-96 overflow-y-auto">
-          <div 
-            v-for="batch in availableBatches" 
+          <div
+            v-for="batch in availableBatches"
             :key="batch.id"
             @click="selectBatch(batch)"
             class="flex items-center p-4 border border-gray-300 rounded-lg mb-2 cursor-pointer hover:bg-gray-50"
           >
-            <img 
-              :src="batch.image ? `/${batch.image}` : '/images/placeholder.jpg'" 
-              alt="Product Image" 
+            <img
+              :src="batch.image ? `/${batch.image}` : '/images/placeholder.jpg'"
+              alt="Product Image"
               class="w-16 h-16 object-cover rounded border border-gray-300 mr-4"
             />
             <div class="flex-1">
@@ -637,9 +605,9 @@
             </div>
           </div>
         </div>
-        
+
         <div class="flex justify-end gap-3 mt-4">
-          <button 
+          <button
             @click="cancelBatchSelection"
             class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
           >
@@ -729,7 +697,7 @@
                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         />
                       </div>
-                      
+
                       <div class="text-left">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Price (LKR)</label>
                         <input
@@ -741,7 +709,7 @@
                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         />
                       </div>
-                      
+
                       <div class="text-left">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
                         <input
@@ -790,127 +758,125 @@
 
     <ExpenseCreateModal v-model:open="isCreateModalOpen" />
 
-  <template v-if="isReturnBillsModalOpen">
-     <!-- Return Bill Form -->
-     <div class="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-30 overflow-auto">
+    <template v-if="isReturnBillsModalOpen">
+      <!-- Return Bill Form -->
+      <div class="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-30 overflow-auto">
         <div class="bg-white mt-20 p-20 rounded-lg shadow-lg w-full max-w-7xl">
-                   <!-- <form @submit.prevent="submitReturnBill"> -->
-                    <div error v-if="errorMessage" class="mb-4 flex items-center justify-between text-red-600 font-medium text-center text-2xl bg-red-100 rounded-lg border border-black-300 px-4 py-2">
-                    {{ errorMessage }}<button type="button" class=" text-black text-align:right" @click="errorMessage=''">X</button>
-                    </div>
-                    <div class="space-y-6">
-                        <!-- Order Code Dropdown -->
-                        <div class="flex flex-col">
-                            <label for="order_id" class="text-xl font-medium text-gray-700">Order Code</label>
-                           <select
-  id="order_id"
-  v-model="ReturnbillForm.order_id"
-  class="mt-2 p-4 border border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-  required
->
-  <option value="" disabled>Select an order</option>
-  <option
-    v-for="sale in props.sales"
-    :key="sale.id"
-    :value="sale.id"
-  >
-    {{ sale.order_id }} — {{ sale.customer ? sale.customer.name : 'No Customer' }}
-  </option>
-</select>
+          <div error v-if="errorMessage" class="mb-4 flex items-center justify-between text-red-600 font-medium text-center text-2xl bg-red-100 rounded-lg border border-black-300 px-4 py-2">
+            {{ errorMessage }}<button type="button" class=" text-black text-align:right" @click="errorMessage=''">X</button>
+          </div>
+          <div class="space-y-6">
+            <!-- Order Code Dropdown -->
+            <div class="flex flex-col">
+              <label for="order_id" class="text-xl font-medium text-gray-700">Order Code</label>
+              <select
+                id="order_id"
+                v-model="ReturnbillForm.order_id"
+                class="mt-2 p-4 border border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="" disabled>Select an order</option>
+                <option
+                  v-for="sale in props.sales"
+                  :key="sale.id"
+                  :value="sale.id"
+                >
+                  {{ sale.order_id }} — {{ sale.customer ? sale.customer.name : 'No Customer' }}
+                </option>
+              </select>
 
-                            <p v-if="ReturnbillForm.errors.order_id" class="text-red-500 text-sm mt-1">{{ ReturnbillForm.errors.order_id }}
-                            </p>
-                        </div>
-                        <!-- Display Selected Order Details -->
-                        <div v-if="selectedSale" class="mt-6 p-4 border rounded-lg bg-gray-50">
-                            <p class="text-lg font-medium">Selected Order Details:</p>
-                            <div class="mt-4 space-y-2">
-                                <!-- <p><span class="font-bold"> ID:</span> {{ selectedSale.id }}</p> -->
-                                <p><span class="font-bold">Order ID:</span> {{ selectedSale.order_id }}</p>
-                                <p><span class="font-bold">Customer Name:</span> {{ selectedSale?.customer?.name ||
-                                    'N/A' }}</p>
-
-                                <p><span class="font-bold">Total Amount:</span> {{ selectedSale.total_amount }}</p>
-                                <p><span class="font-bold">Discount:</span> {{ selectedSale.discount }}</p>
-                                <p><span class="font-bold">Payment Method:</span> {{ selectedSale.payment_method }}</p>
-                                <p><span class="font-bold">Sale Date:</span> {{ selectedSale.sale_date }}</p>
-                            </div>
-                        </div>
-                        <!-- Display Sale Items -->
-                        <div v-if="filteredSaleItems.length" class="mt-6 p-4 border rounded-lg bg-gray-50">
-                            <p class="text-lg font-medium">Items in this Sale:</p>
-                            <div class="mt-4 max-h-96 overflow-y-auto">
-                            <table class="mt-4 w-full border-collapse border border-gray-200">
-                                <thead>
-                                    <tr>
-                                        <th class="border border-gray-300 px-4 py-2">Product ID</th>
-                                        <th class="border border-gray-300 px-8 py-4">Quantity</th>
-                                        <th class="border border-gray-300 px-4 py-2">Unit Price</th>
-                                        <th class="border border-gray-300 px-4 py-2">Total Price</th>
-                                        <th class="border border-gray-300 px-4 py-2">Reason</th>
-                                        <th class="border border-gray-300 px-4 py-2">Return Date</th>
-                                        <th class="border border-gray-300 px-4 py-2">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(item, index) in filteredSaleItems" :key="item.id">
-                                        <td class="border border-gray-300 px-4 py-2">
-                                            <div class="pb-2"> {{ item.product.name }}</div>
-                                            <img :src="item.product.image ? `/${item.product.image}` : '/images/placeholder.jpg'"
-                                                alt="Product Image" class="w-20 h-20 object-cover rounded-lg" />
-                                        </td>
-                                        <td class="border border-gray-300 px-4 py-2"><div class="flex items-center space-x-2"><p @click="incrementReturnQuantity(item.id)"
-                                            class="flex items-center justify-center w-8 h-8 text-white bg-black rounded cursor-pointer">
-                                            <i class="ri-add-line"></i>
-                                        </p><span class="px-2">{{ item.quantity }}</span><p @click="decrementReturnQuantity(item.id)"
-                                            class="flex items-center justify-center w-8 h-8 text-white bg-black rounded cursor-pointer">
-                                            <i class="ri-subtract-line"></i>
-                                        </p></div></td>
-                                        <td class="border border-gray-300 px-4 py-2">{{ item.unit_price }}</td>
-                                        <td class="border border-gray-300 px-4 py-2">{{ item.total_price }}</td>
-                                        <td class="border border-gray-300 px-4 py-2">
-                                            <textarea v-model="item.reason" placeholder="Enter reason for return"
-                                                class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                                        </td>
-                                        <td class="border border-gray-300 px-4 py-2">
-                                            <input v-model="item.return_date" type="date"
-                                                class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                        </td>
-                                        <td class="border border-gray-300 px-4 py-2">
-                                            <button @click="removeItem(index)" class="text-red-500 hover:text-red-700">
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                    stroke="currentColor" class="w-6 h-6">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            </div>
-                        </div>
-                        <!-- Submit Button -->
-                         
-                        <div class="flex justify-center gap-between w-full space-x-8">
-                            <button
-                                @click="handleReturnBillSave"
-                                class="px-8 py-3 text-lg font-bold tracking-wider text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 focus:outline-none"
-                            >
-                                Save
-                            </button>
-
-                            <button type="button" @click="isReturnBillsModalOpen = false"
-                                    class="px-8 py-3 text-lg font-bold tracking-wider text-gray-700 uppercase bg-gray-300 rounded-xl hover:bg-gray-400 focus:outline-none">
-                                    Cancel
-                            </button>
-                        </div>
-                    </div>
-                <!-- </form> -->
+              <p v-if="ReturnbillForm.errors.order_id" class="text-red-500 text-sm mt-1">{{ ReturnbillForm.errors.order_id }}</p>
             </div>
-     </div>
-    </template>
+            <!-- Display Selected Order Details -->
+            <div v-if="selectedSale" class="mt-6 p-4 border rounded-lg bg-gray-50">
+              <p class="text-lg font-medium">Selected Order Details:</p>
+              <div class="mt-4 space-y-2">
+                <p><span class="font-bold">Order ID:</span> {{ selectedSale.order_id }}</p>
+                <p><span class="font-bold">Customer Name:</span> {{ selectedSale?.customer?.name || 'N/A' }}</p>
+                <p><span class="font-bold">Total Amount:</span> {{ selectedSale.total_amount }}</p>
+                <p><span class="font-bold">Discount:</span> {{ selectedSale.discount }}</p>
+                <p><span class="font-bold">Payment Method:</span> {{ selectedSale.payment_method }}</p>
+                <p><span class="font-bold">Sale Date:</span> {{ selectedSale.sale_date }}</p>
+              </div>
+            </div>
+            <!-- Display Sale Items -->
+            <div v-if="filteredSaleItems.length" class="mt-6 p-4 border rounded-lg bg-gray-50">
+              <p class="text-lg font-medium">Items in this Sale:</p>
+              <div class="mt-4 max-h-96 overflow-y-auto">
+                <table class="mt-4 w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr>
+                      <th class="border border-gray-300 px-4 py-2">Product ID</th>
+                      <th class="border border-gray-300 px-8 py-4">Quantity</th>
+                      <th class="border border-gray-300 px-4 py-2">Unit Price</th>
+                      <th class="border border-gray-300 px-4 py-2">Total Price</th>
+                      <th class="border border-gray-300 px-4 py-2">Reason</th>
+                      <th class="border border-gray-300 px-4 py-2">Return Date</th>
+                      <th class="border border-gray-300 px-4 py-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, index) in filteredSaleItems" :key="item.id">
+                      <td class="border border-gray-300 px-4 py-2">
+                        <div class="pb-2"> {{ item.product.name }}</div>
+                        <img :src="item.product.image ? `/${item.product.image}` : '/images/placeholder.jpg'"
+                          alt="Product Image" class="w-20 h-20 object-cover rounded-lg" />
+                      </td>
+                      <td class="border border-gray-300 px-4 py-2">
+                        <div class="flex items-center space-x-2">
+                          <p @click="incrementReturnQuantity(item.id)"
+                             class="flex items-center justify-center w-8 h-8 text-white bg-black rounded cursor-pointer">
+                            <i class="ri-add-line"></i>
+                          </p>
+                          <span class="px-2">{{ item.quantity }}</span>
+                          <p @click="decrementReturnQuantity(item.id)"
+                             class="flex items-center justify-center w-8 h-8 text-white bg-black rounded cursor-pointer">
+                            <i class="ri-subtract-line"></i>
+                          </p>
+                        </div>
+                      </td>
+                      <td class="border border-gray-300 px-4 py-2">{{ item.unit_price }}</td>
+                      <td class="border border-gray-300 px-4 py-2">{{ item.total_price }}</td>
+                      <td class="border border-gray-300 px-4 py-2">
+                        <textarea v-model="item.reason" placeholder="Enter reason for return"
+                          class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                      </td>
+                      <td class="border border-gray-300 px-4 py-2">
+                        <input v-model="item.return_date" type="date"
+                          class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </td>
+                      <td class="border border-gray-300 px-4 py-2">
+                        <button @click="removeItem(index)" class="text-red-500 hover:text-red-700">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                              stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Submit Button -->
+            <div class="flex justify-center gap-between w-full space-x-8">
+              <button
+                @click="handleReturnBillSave"
+                class="px-8 py-3 text-lg font-bold tracking-wider text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 focus:outline-none"
+              >
+                Save
+              </button>
 
+              <button type="button" @click="isReturnBillsModalOpen = false"
+                      class="px-8 py-3 text-lg font-bold tracking-wider text-gray-700 uppercase bg-gray-300 rounded-xl hover:bg-gray-400 focus:outline-none">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <!-- Customer/Orders Modal -->
     <template v-if="isModalOpen">
@@ -1041,14 +1007,14 @@ const props = defineProps({
   sizes: Array,
   returnReasons: Array,
   sales:Array,
-    saleItems: { // Add this prop
-        type: Array,
-        default: () => []
-    },
+  saleItems: {
+    type: Array,
+    default: () => []
+  },
 });
 
 const products = ref([]);
-const services = ref([]); 
+const services = ref([]);
 const isSuccessModalOpen = ref(false);
 const isAlertModalOpen = ref(false);
 const message = ref("");
@@ -1124,21 +1090,13 @@ const openExpenseCreate = () => {
 
 // Custom Product Functions
 const openCustomProductModal = () => {
-  customProduct.value = {
-    name: '',
-    price: '',
-    quantity: 1
-  };
+  customProduct.value = { name: '', price: '', quantity: 1 };
   isCustomProductModalOpen.value = true;
 };
 
 const closeCustomProductModal = () => {
   isCustomProductModalOpen.value = false;
-  customProduct.value = {
-    name: '',
-    price: '',
-    quantity: 1
-  };
+  customProduct.value = { name: '', price: '', quantity: 1 };
 };
 
 const addCustomProduct = () => {
@@ -1148,25 +1106,23 @@ const addCustomProduct = () => {
   }
 
   const customItem = {
-    id: Date.now(), // Temporary ID for frontend
+    id: Date.now(),
     type: 'custom',
     name: customProduct.value.name,
     price: parseFloat(customProduct.value.price),
     quantity: parseInt(customProduct.value.quantity),
     selling_price: parseFloat(customProduct.value.price),
-    apply_discount: false
+    apply_discount: false,
+    include_custom: true, // DEFAULT CHECKED NOW
   };
 
   products.value.push(customItem);
   closeCustomProductModal();
 };
 
-
 const removeItem = (index) => {
-    saleItemsState.value.splice(index, 1);
+  saleItemsState.value.splice(index, 1);
 };
-
-
 
 function toggleEditService(index) {
   const service = services.value[index];
@@ -1203,11 +1159,6 @@ const customer = ref({
   address: "",
 });
 
- 
-
-
-
-
 const employee_id = ref("");
 const selectedEmployee = computed(() =>
   (props.allemployee || []).find((e) => e.id === employee_id.value) || null
@@ -1227,15 +1178,11 @@ const removeCoupon = () => {
 };
 const incrementQuantity = (id) => {
   const product = products.value.find((item) => item.id === id);
-  if (product) {
-    product.quantity += 1;
-  }
+  if (product) product.quantity += 1;
 };
 const decrementQuantity = (id) => {
   const product = products.value.find((item) => item.id === id);
-  if (product && product.quantity > 1) {
-    product.quantity -= 1;
-  }
+  if (product && product.quantity > 1) product.quantity -= 1;
 };
 
 const logout = async () => {
@@ -1269,12 +1216,7 @@ const submitOrder = async () => {
   }
 
   if (selectedPaymentMethod.value === 'online') {
-    if (
-      !cheque_number.value ||
-      !bank_name.value ||
-      !cheque_date.value ||
-      !cheque_amount.value
-    ) {
+    if (!cheque_number.value || !bank_name.value || !cheque_date.value || !cheque_amount.value) {
       isAlertModalOpen.value = true;
       message.value = "Please fill in all cheque fields (number, bank, date, amount)";
       isSubmitting.value = false;
@@ -1283,17 +1225,15 @@ const submitOrder = async () => {
   }
 
   try {
-
-     const returnItemsData = saleItemsState.value.map(item => ({
-            sale_id: ReturnbillForm.order_id,
-            customer_id: selectedSale.value?.customer_id || null,
-            product_id: item.product_id,
-            quantity: item.quantity,
-            reason: item.reason,
-            unit_price: item.unit_price,    // Make sure this is included
-            return_date: item.return_date || new Date().toISOString().split('T')[0], // Default to today if not provided
-        }));
-
+    const returnItemsData = saleItemsState.value.map(item => ({
+      sale_id: ReturnbillForm.order_id,
+      customer_id: selectedSale.value?.customer_id || null,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      reason: item.reason,
+      unit_price: item.unit_price,
+      return_date: item.return_date || new Date().toISOString().split('T')[0],
+    }));
 
     const payload = {
       customer: customer.value,
@@ -1343,48 +1283,39 @@ const submitOrder = async () => {
   }
 };
 
-
 const handleReturnBillSave = () => {
-    const missingReason = filteredSaleItems.value.some(item => !item.reason.trim());
-    if(missingReason){
-     errorMessage.value = "Please provide a reason for all return items";
+  const missingReason = filteredSaleItems.value.some(item => !item.reason.trim());
+  if (missingReason) {
+    errorMessage.value = "Please provide a reason for all return items";
     return;
-    }
-    errorMessage.value = "";
-    isReturnBillsModalOpen.value = false
-   
-   
-};   
-    
-
+  }
+  errorMessage.value = "";
+  isReturnBillsModalOpen.value = false;
+};
 
 const openReturnBills = () => {
-    isReturnBillsModalOpen.value = true;
+  isReturnBillsModalOpen.value = true;
 };
+
 const ReturnbillForm = useForm({
-    order_id:"",
-    reason:"",
-    return_date:"",
-    
+  order_id:"",
+  reason:"",
+  return_date:"",
 });
 
 const filteredSaleItems = computed(() => {
-    if (!props.saleItems || !Array.isArray(props.saleItems)) {
-        return [];
-    }
-    
-    const items = props.saleItems.filter((item) => item.sale_id === ReturnbillForm.order_id);
-    saleItemsState.value = items.map((item) => ({ ...item, reason: "", return_date: "" }));
-    return saleItemsState.value;
+  if (!props.saleItems || !Array.isArray(props.saleItems)) return [];
+  const items = props.saleItems.filter((item) => item.sale_id === ReturnbillForm.order_id);
+  saleItemsState.value = items.map((item) => ({ ...item, reason: "", return_date: "" }));
+  return saleItemsState.value;
 });
 
 const returnBillTotal = computed(() => {
-    if (!filteredSaleItems.value.length) return 0;
-    return filteredSaleItems.value.reduce((sum, item) => {
-        return sum + (parseFloat(item.total_price) || 0);
-    }, 0);
+  if (!filteredSaleItems.value.length) return 0;
+  return filteredSaleItems.value.reduce((sum, item) => {
+    return sum + (parseFloat(item.total_price) || 0);
+  }, 0);
 });
-
 
 const updateOrder = async () => {
   if (!selectedOrder.value?.order_id) {
@@ -1431,8 +1362,8 @@ const updateOrder = async () => {
 
 const subtotal = computed(() => {
   const productTotal = products.value.reduce((t, item) => {
-    const price = isWholesale.value ? parseFloat(item.whole_price) : parseFloat(item.selling_price);
-    return t + price * (Number(item.quantity) || 0);
+    const price = isWholesale.value ? parseFloat(item.whole_price) : parseFloat(item.selling_price ?? item.price);
+    return t + (price || 0) * (Number(item.quantity) || 0);
   }, 0);
 
   const serviceTotal = services.value.reduce((t, s) => {
@@ -1447,10 +1378,10 @@ const subtotal = computed(() => {
 const totalDiscount = computed(() => {
   const productDiscount = products.value.reduce((t, item) => {
     if (item.discount && item.discount > 0 && item.apply_discount === true) {
-      const discountAmount =
-        (parseFloat(item.selling_price) - parseFloat(item.discounted_price)) *
-        (Number(item.quantity) || 0);
-      return t + discountAmount;
+      const unitBase = parseFloat(item.selling_price ?? item.price) || 0;
+      const unitDisc = parseFloat(item.discounted_price ?? unitBase) || 0;
+      const diff = (unitBase - unitDisc) * (Number(item.quantity) || 0);
+      return t + Math.max(diff, 0);
     }
     return t;
   }, 0);
@@ -1461,26 +1392,44 @@ const totalDiscount = computed(() => {
   return (productDiscount + couponDiscount + orderLevelDiscount).toFixed(2);
 });
 
+// NEW: subtotal of products that are ticked for Custom Discount
+const eligibleCustomSubtotal = computed(() => {
+  return products.value.reduce((sum, item) => {
+    if (!item.include_custom) return sum;
+    const unit = isWholesale.value
+      ? parseFloat(item.whole_price)
+      : parseFloat(item.selling_price ?? item.price);
+    const qty = Number(item.quantity) || 0;
+    return sum + (unit || 0) * qty;
+  }, 0);
+});
+
 const validateCustomDiscount = () => {
   if (!custom_discount.value || isNaN(custom_discount.value)) {
     custom_discount.value = 0;
   }
 };
 
+// UPDATED: apply custom discount ONLY on eligibleCustomSubtotal
 const total = computed(() => {
   const subtotalValue = parseFloat(subtotal.value) || 0;
   const discountValue = parseFloat(totalDiscount.value) || 0;
-  const customDiscount = parseFloat(custom_discount.value) || 0;
   const returnAmount = parseFloat(returnBillTotal.value) || 0;
 
+  const customValueInput = parseFloat(custom_discount.value) || 0;
+  const eligibleSub = parseFloat(eligibleCustomSubtotal.value) || 0;
+
   let customValue = 0;
-  if (custom_discount_type.value === "percent") {
-    customValue = (subtotalValue * customDiscount) / 100;
-  } else if (custom_discount_type.value === "fixed") {
-    customValue = customDiscount;
+  if (eligibleSub > 0 && customValueInput > 0) {
+    if (custom_discount_type.value === "percent") {
+      customValue = (eligibleSub * customValueInput) / 100;
+    } else {
+      customValue = Math.min(customValueInput, eligibleSub);
+    }
   }
 
-  return (subtotalValue - discountValue - customValue - returnAmount).toFixed(2);
+  const grand = subtotalValue - discountValue - customValue - returnAmount;
+  return grand.toFixed(2);
 });
 
 const total_to_include_guide = computed(() => {
@@ -1535,10 +1484,7 @@ const submitBarcode = async () => {
     const response = await axios.post(route("pos.getProduct"), { barcode: form.barcode });
     const { product: fetchedProduct, batches: fetchedBatches, error: fetchedError } = response.data;
 
-    console.log('Fetched Product:', fetchedProduct); // Debugging line
-
     if (fetchedBatches && fetchedBatches.length > 1) {
-      // Show batch selection modal
       pendingBarcode.value = form.barcode;
       availableBatches.value = fetchedBatches;
       showBatchSelection.value = true;
@@ -1555,13 +1501,16 @@ const submitBarcode = async () => {
       }
 
       const existing = products.value.find((i) => i.id === fetchedProduct.id);
-      if (existing) existing.quantity += 1;
-      else
+      if (existing) {
+        existing.quantity += 1;
+      } else {
         products.value.push({
           ...fetchedProduct,
           quantity: 1,
           apply_discount: false,
+          include_custom: true, // DEFAULT CHECKED NOW
         });
+      }
 
       form.barcode = "";
       focusBarcodeField();
@@ -1594,13 +1543,16 @@ const selectBatch = (batch) => {
   }
 
   const existing = products.value.find((i) => i.id === batch.id);
-  if (existing) existing.quantity += 1;
-  else
+  if (existing) {
+    existing.quantity += 1;
+  } else {
     products.value.push({
       ...batch,
       quantity: 1,
       apply_discount: false,
+      include_custom: true, // DEFAULT CHECKED NOW
     });
+  }
 
   cancelBatchSelection();
   focusBarcodeField();
@@ -1629,60 +1581,47 @@ const clearScanBuffer = () => {
   }
 };
 
-
-// Handle input from the barcode scanner
+// Handle input from the barcode scanner (simple mode)
+let barcode = "";
+let timeout = null;
 const handleScannerInput = (event) => {
-    clearTimeout(timeout); // Clear the timeout for each keypress
-    if (event.key === "Enter") {
-        // Barcode scanning completed
-        form.barcode = barcode; // Set the scanned barcode into the form
-        submitBarcode(); // Automatically submit the barcode
-        barcode = ""; // Reset the barcode for the next scan
-    } else {
-        // Append the pressed key to the barcode
-        barcode += event.key;
-    }
-
-    // Timeout to reset the barcode if scanning is interrupted
-    timeout = setTimeout(() => {
-        barcode = "";
-    }, 100); // Adjust timeout based on scanner speed
+  clearTimeout(timeout);
+  if (event.key === "Enter") {
+    form.barcode = barcode;
+    submitBarcode();
+    barcode = "";
+  } else {
+    barcode += event.key;
+  }
+  timeout = setTimeout(() => {
+    barcode = "";
+  }, 100);
 };
 
-
 onMounted(async() => {
-    document.addEventListener("keypress", handleScannerInput);
+  document.addEventListener("keypress", handleScannerInput);
 
-    try{
-        const response = await axios.get('/pos');
-        sales.value = response.data.sales || [];
-    }
-    catch(error){
-        console.error("Error fetching sales:", error);
-        sales.value = [];
-    }
-    
+  try{
+    const response = await axios.get('/pos');
+    sales.value = response.data.sales || [];
+  }
+  catch(error){
+    console.error("Error fetching sales:", error);
+    sales.value = [];
+  }
 });
-
 
 const handleScannerKeydown = (e) => {
   const active = document.activeElement;
   const inBarcode = active === barcodeInputRef.value;
-
-  // If Enter is pressed while cursor is inside the barcode field,
-  // let the input's own @keydown.enter handler do the submit (avoid double).
   if (e.key === "Enter" && inBarcode) return;
 
-  // Detect fast scanner bursts
   const now = Date.now();
   const isScannerBurst = now - lastKeyTime < 35;
   lastKeyTime = now;
 
   if (isChar(e)) {
-    if (inBarcode) {
-      // When focused in barcode input, let the browser type normally
-      return;
-    }
+    if (inBarcode) return;
     if (isScannerBurst) {
       if (!barcodeInputRef.value) return;
       barcodeInputRef.value.focus();
@@ -1707,25 +1646,21 @@ const handleScannerKeydown = (e) => {
 const sales = ref([]);
 const saleItemsState = ref([]);
 
-
-
 const incrementReturnQuantity = (id) => {
-    const item = saleItemsState.value.find((item) => item.id === id);
-    if (item) {
-        item.quantity += 1;
-        item.total_price = item.unit_price * item.quantity; // Update total price
-    }
+  const item = saleItemsState.value.find((item) => item.id === id);
+  if (item) {
+    item.quantity += 1;
+    item.total_price = item.unit_price * item.quantity;
+  }
 };
 
 const decrementReturnQuantity = (id) => {
-    const item = saleItemsState.value.find((item) => item.id === id);
-    if (item && item.quantity > 1) {
-        item.quantity -= 1;
-        item.total_price = item.unit_price * item.quantity; // Update total price
-    }
+  const item = saleItemsState.value.find((item) => item.id === id);
+  if (item && item.quantity > 1) {
+    item.quantity -= 1;
+    item.total_price = item.unit_price * item.quantity;
+  }
 };
- 
-
 
 const focusOnCashField = () => {
   nextTick(() => {
@@ -1758,13 +1693,16 @@ const removeDiscount = (id) => {
 const handleSelectedProducts = (selectedProducts) => {
   selectedProducts.forEach((fetchedProduct) => {
     const existing = products.value.find((i) => i.id === fetchedProduct.id);
-    if (existing) existing.quantity += 1;
-    else
+    if (existing) {
+      existing.quantity += 1;
+    } else {
       products.value.push({
         ...fetchedProduct,
         quantity: 1,
         apply_discount: false,
+        include_custom: true, // DEFAULT CHECKED NOW
       });
+    }
   });
 
   focusBarcodeField();
@@ -1787,33 +1725,21 @@ const handleKeyDown = (event) => {
     event.preventDefault();
     isModalOpen.value = true;
   }
-
-   if (event.key === "F5") {
+  if (event.key === "F5") {
     event.preventDefault();
     isReturnBillsModalOpen.value = true;
   }
 
-
-
-if (event.key === "Shift") {
-  event.preventDefault();
-  nextTick(() => {
-    asideRef.value?.focus?.();
-    const first = asideFocusOrder.value?.[0];
-    first?.focus?.();
-    first?.select?.();
-  });
-}
-
-
-
-
-
-
+  if (event.key === "Shift") {
+    event.preventDefault();
+    nextTick(() => {
+      asideRef.value?.focus?.();
+      const first = asideFocusOrder.value?.[0];
+      first?.focus?.();
+      first?.select?.();
+    });
+  }
 };
-
-
-
 
 const getFocusable = (r) => {
   const inner = r?.$el?.querySelector?.('input,select,textarea,button,[tabindex]');
@@ -1822,22 +1748,13 @@ const getFocusable = (r) => {
   return r?.$el || r;
 };
 
-
 const asideFocusOrder = computed(() => {
   return [
-    () => getFocusable(customDiscountRef.value), // Custom Discount
-    () => getFocusable(cashInputRef.value),      // Cash
-    () => getFocusable(confirmButtonRef.value),  // Confirm Order
+    () => getFocusable(customDiscountRef.value),
+    () => getFocusable(cashInputRef.value),
+    () => getFocusable(confirmButtonRef.value),
   ].map((fn) => fn()).filter(Boolean);
 });
-
-
-
-
-
-
-
-
 
 function focusAsideIndex(i) {
   const list = asideFocusOrder.value;
@@ -1872,7 +1789,7 @@ function onAsideKeydown(e) {
 onMounted(() => {
   barcodeInputRef.value?.focus();
   window.addEventListener("keydown", handleKeyDown);
-  window.addEventListener("keydown", handleScannerKeydown); // scanner hook
+  window.addEventListener("keydown", handleScannerKeydown);
 });
 
 onBeforeUnmount(() => {
@@ -1921,6 +1838,7 @@ const fetchreturn = async () => {
           apply_discount: false,
           returnReason: product.pivot?.reason_id || null,
           pivot: product.pivot,
+          include_custom: true, // DEFAULT CHECKED NOW FOR PAST ORDERS
         }));
       } else {
         products.value = [];
@@ -1986,21 +1904,16 @@ const handlePrintoutsSelected = (selectedPrintouts) => {
       id: printout.id,
       type: 'printout',
       name: printout.name || 'Unnamed Printout',
-
       price: parseFloat(printout.price),
-           quantity: parseInt(printout.quantity),
+      quantity: parseInt(printout.quantity),
       selling_price: parseFloat(printout.price),
-      apply_discount: false
+      apply_discount: false,
+      include_custom: true, // DEFAULT CHECKED NOW
     };
     products.value.push(printoutItem);
   });
-  
-  // Show success message - REMOVED
-  // isAlertModalOpen.value = true;
-  // message.value = `Added ${selectedPrintouts.length} printout(s) to sale`;
 };
 
-// Update the fetchPrintouts method
 const fetchPrintouts = () => {
   isPrintoutModalOpen.value = true;
 };
@@ -2031,7 +1944,6 @@ function focusFieldByIndex(i) {
   if (!list.length) return;
   const idx = (i + list.length) % list.length;
   const el = list[idx];
-  // Vue refs can be components (e.g., custom inputs); try common focus targets
   const target =
     el?.$el?.querySelector?.("input,select,textarea,button") ||
     el?.$el ||
@@ -2050,7 +1962,6 @@ function currentFocusedIndex() {
 }
 
 function onCustomerModalKeydown(e) {
-  // Up/Down to navigate
   if (e.key === "ArrowDown" || e.key === "Down") {
     e.preventDefault();
     const i = currentFocusedIndex();
@@ -2064,34 +1975,31 @@ function onCustomerModalKeydown(e) {
     return;
   }
 
-  // Enter to Save (unless modifier keys)
   if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     addCustomerDetails();
   }
 }
 
-// When modal opens, focus first field
 watch(
+  () => ReturnbillForm.order_id,
+  (newValue) => {
+    const sale = props.sales.find((sale) => sale.id === newValue) || null;
+    if (sale) {
+      ReturnbillForm.discount = sale.discount || 0;
+    } else {
+      ReturnbillForm.discount = 0;
+    }
+    console.log(sale);
+  }
+);
 
-() => ReturnbillForm.order_id,
-    (newValue) => {
-        const sale = props.sales.find((sale) => sale.id === newValue) || null;
-        if (sale) {
-            ReturnbillForm.discount = sale.discount || 0;
-        } else {
-            ReturnbillForm.discount = 0; // Default if no sale is found
-        }
-        console.log(sale);
-    },
-
+watch(
   () => isModalOpen.value,
   async (open) => {
     if (open) {
       await nextTick();
-      // Bring keyboard focus into the modal container first (for key handling)
       customerModalRef.value?.focus?.();
-      // Then focus the very first input
       focusFieldByIndex(0);
     }
   }
