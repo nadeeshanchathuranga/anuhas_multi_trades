@@ -1508,7 +1508,7 @@ const submitBarcode = async () => {
           ...fetchedProduct,
           quantity: 1,
           apply_discount: false,
-          include_custom: true, // DEFAULT CHECKED NOW
+          include_custom: false, // DEFAULT CHECKED NOW
         });
       }
 
@@ -1550,7 +1550,7 @@ const selectBatch = (batch) => {
       ...batch,
       quantity: 1,
       apply_discount: false,
-      include_custom: true, // DEFAULT CHECKED NOW
+      include_custom: false, // DEFAULT CHECKED NOW
     });
   }
 
@@ -1700,7 +1700,7 @@ const handleSelectedProducts = (selectedProducts) => {
         ...fetchedProduct,
         quantity: 1,
         apply_discount: false,
-        include_custom: true, // DEFAULT CHECKED NOW
+        include_custom: false, // DEFAULT CHECKED NOW
       });
     }
   });
@@ -1838,7 +1838,7 @@ const fetchreturn = async () => {
           apply_discount: false,
           returnReason: product.pivot?.reason_id || null,
           pivot: product.pivot,
-          include_custom: true, // DEFAULT CHECKED NOW FOR PAST ORDERS
+          include_custom: false, // DEFAULT CHECKED NOW FOR PAST ORDERS
         }));
       } else {
         products.value = [];
@@ -1908,7 +1908,7 @@ const handlePrintoutsSelected = (selectedPrintouts) => {
       quantity: parseInt(printout.quantity),
       selling_price: parseFloat(printout.price),
       apply_discount: false,
-      include_custom: true, // DEFAULT CHECKED NOW
+      include_custom: false, // DEFAULT CHECKED NOW
     };
     products.value.push(printoutItem);
   });
