@@ -488,6 +488,9 @@ const printReceipt = (history) => {
     <div><b>Billing:</b> ${Number(history.is_whole) > 0 ? "Wholesale" : "Retail"}</div>
     <div><b>Credit Bill:</b> ${Number(history.credit_bill) ? "Yes" : "No"}</div>
   </div>
+  <div class="row">
+    <div><b>Payment:</b> ${history.payment_method || "Cash"}</div>
+  </div>
 
   <div class="section">
     <table>
