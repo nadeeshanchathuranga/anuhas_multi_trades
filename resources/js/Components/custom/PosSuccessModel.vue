@@ -173,35 +173,37 @@ const handlePrintReceipt = () => {
   
   const totalProductCount = props.products.length;
 
-  const productRows = props.products
-  .map((product, index) => {
-    return `
-      <tr>
-        <td style="text-align: left; padding: 4px 0; font-weight: bold; width: 40%; font-size: 10px;">${index + 1}. ${product.name}</td>
-        <td style="text-align: center; padding: 4px 0; font-weight: bold; width: 15%; font-size: 10px;">${product.quantity}</td>
-        <td style="text-align: center; padding: 4px 0; font-weight: bold; width: 20%; font-size: 10px;">${Number(product.selling_price).toFixed(2)}</td>
-        <td style="text-align: right; padding: 4px 0; font-weight: bold; width: 25%; font-size: 10px;">
-          ${
-            product.discount > 0 && product.apply_discount
-              ? (product.selling_price * product.quantity * (1 - product.discount / 100)).toFixed(2)
-              : (product.selling_price * product.quantity).toFixed(2)
-          }
-        </td>
-      </tr>
-      ${
-        product.discount > 0 && product.apply_discount
-          ? `<tr>
-               <td colspan="4" style="text-align: center; padding: 2px 0;">
-                 <div style="font-weight: bold; font-size: 9px; background:black; color:white; text-align:center; border-radius:3px; display:inline-block; padding:1px 6px;">
-                   ${product.discount}% OFF
-                 </div>
-               </td>
-             </tr>`
-          : ""
-      }
-    `;
-  })
-  .join("");
+    const productRows = props.products
+    .map((product) => {
+      return `
+        <tr>
+          <td colspan="3" style="padding: 4px 0; font-weight: bold;">
+            ${product.name}
+          </td>
+        </tr>
+        <tr style="border-bottom: 1px dashed #999;">
+          <td></td>
+          <td style="text-align: center; padding: 2px 0;">
+            ${product.selling_price} × ${product.quantity}
+            ${
+              product.discount > 0 && product.apply_discount
+                ? `<div style="font-weight: bold; font-size: 9px; background:black; color:white; text-align:center; margin-top:2px; border-radius:3px; display:inline-block; padding:0 4px;">
+                     ${product.discount}% OFF
+                   </div>`
+                : ""
+            }
+          </td>
+          <td style="text-align: right; padding: 2px 0;">
+            ${
+              product.discount > 0 && product.apply_discount
+                ? (product.selling_price * product.quantity * (1 - product.discount / 100)).toFixed(2)
+                : (product.selling_price * product.quantity).toFixed(2)
+            }
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
 
   const receiptHTML = `
 <!DOCTYPE html>
@@ -211,147 +213,106 @@ const handlePrintReceipt = () => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Receipt</title>
 <style>
-  @media print { body { margin:0; padding:0; -webkit-print-color-adjust: exact; } }
-  body { background:#fff; font-size:12px; font-family: Arial, sans-serif; margin:0; padding:10px; color:#000; font-weight:600; }
-  .section { margin-bottom:16px; padding-top:8px; border-top:1px solid #000; }
-  .info-row { display:flex; justify-content:space-between; font-size:12px; margin-top:8px; }
-  .info-row p { margin:0; font-weight:bold; }
-  .info-row small { font-weight:normal; }
-  table { width:100%; font-size:12px; border-collapse:collapse; margin-top:8px; }
-  table th, table td { padding:6px 8px; }
-  table th { text-align:left; }
-  table td { text-align:right; }
-  table td:first-child { text-align:left; }
-  .totals { border-top:1px solid #000; padding-top:8px; font-size:12px; }
-  .totals div { display:flex; justify-content:space-between; margin-bottom:8px; }
-  .totals div:last-child { font-size:14px; font-weight:bold; }
-  .footer { text-align:center; font-size:10px; margin-top:16px; }
-  .header-line { border-bottom:1px solid #000; padding-bottom:10px; margin-bottom:10px; }
+  @media print { 
+    body { margin:0; padding:0; -webkit-print-color-adjust: exact; } 
+    @page { margin: 0; size: 80mm auto; }
+  }
+  body { 
+    background:#fff; 
+    font-size:12px; 
+    font-family: 'Courier New', Courier, monospace; 
+    margin:0; 
+    padding:8px; 
+    color:#000; 
+    width: 80mm;
+    max-width: 80mm;
+    font-weight:bold;
+  }
+  .header { text-align:center; margin-bottom:10px; }
+  .header h1 { margin:2px 0; font-size:14px; font-weight:bold; }
+  .header p { margin:1px 0; font-size:11px; }
+  .dashed { border-top:1px dashed #000; margin:8px 0; }
+  .info-row { display:flex; justify-content:space-between; font-size:11px; margin:3px 0; }
+  .section-title { text-align:center; font-size:11px; margin:8px 0; }
+  table { width:100%; font-size:11px; border-collapse:collapse; margin-top:5px; }
+  table th { text-align:left; padding:2px 0; border-bottom:1px dashed #000; }
+  table td { padding:2px 0; }
+  .totals { margin-top:8px; font-size:11px; }
+  .totals div { display:flex; justify-content:space-between; margin:3px 0; }
+  .totals .total-line { font-size:13px; font-weight:bold;   padding-top:5px; margin-top:5px; }
+  .footer { text-align:center; font-size:11px; margin-top:10px; }
 </style>
 </head>
 <body>
   <div class="receipt-container">
     <!-- Header -->
-   <div class="header-line">
-  <div style="display:flex; justify-content:center; align-items:center;">
-    <!--
-    <div style="flex-shrink:0; text-align:right;">
-      <img src="/images/billlogo.jpg" alt="Company Logo" style="width:100px; height:100px; object-fit:contain; margin-top:15px;" />
+    <div class="header">
+      <h1>${companyInfo?.value?.name || ""}</h1>
+      <p>${companyInfo?.value?.address || ""}</p>
+      <p>${companyInfo?.value?.phone || ""}${companyInfo?.value?.phone2 ? " / " + companyInfo.value.phone2 : ""}</p>
     </div>
-    -->
-    <div style="text-align:center; flex-grow:1; color:#000;">
-      ${
-        companyInfo?.value?.name
-          ? `<h1 style="margin:0; font-size:16px; font-weight:bold;">${companyInfo.value.name}</h1>`
-          : ""
-      }
-      ${
-        companyInfo?.value?.address
-          ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.address}</p>`
-          : ""
-      }
-      ${
-        (companyInfo?.value?.phone || companyInfo?.value?.phone2 || companyInfo?.value?.email)
-          ? `<p style="margin:2px 0; font-size:12px;">
-               ${companyInfo.value.phone || ""}
-               ${companyInfo.value.phone2 ? " | " + companyInfo.value.phone2 : ""}
-               ${companyInfo.value.email ? " | " + companyInfo.value.email : ""}
-             </p>`
-          : ""
-      }
-      ${
-        companyInfo?.value?.website
-          ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.website}</p>`
-          : ""
-      }
-    </div>
-  </div>
-</div>
 
+  
 
+    <!-- Info Section -->
     <div class="info-row">
-      <div>
-        <p>Date & Time:</p>
-        <small>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</small>
-      </div>
-      <div>
-        <p>Order No:</p>
-        <small>${props.orderid}</small>
-      </div>
+      <span>Cashier:${props.cashier?.name || "Manager"}</span>
+      <span>MachNo:${props.orderid || "0000"}</span>
     </div>
 
-    <div class="info-row">
-      <div>
-        <p>Customer:</p>
-        <small>${props.customer?.name || ""}</small>
-      </div>
-      <div>
-        <p>Cashier:</p>
-        <small>${props.cashier?.name || ""}</small>
-      </div>
-    </div>
+    
 
-    <div class="info-row">
-      <p>Billing Type: <small>${props.isWholesale ? "Wholesale" : "Retail"}</small></p>
-      <p>Payment: <small>${props.paymentMethod === "online" ? "Cheque" : (props.paymentMethod || "Cash")}</small></p>
-      <p>Credit Bill: <small>${props.credit_bill ? "Yes" : "No"}</small></p>
-    </div>
+    <!-- Products Table -->
+    <table>
+      <thead>
+        <tr>
+         <th style="text-align:left; padding:4px;">Items</th>
+            <th style="text-align:center; padding:4px;">Price × Qty</th>
+            <th style="text-align:right; padding:4px;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${productRows}
+      </tbody>
+    </table>
 
-    <div class="section">
-      <div style="margin-bottom: 8px; font-weight: bold; font-size: 10px;">
-        Total Products: ${totalProductCount}
-      </div>
-      <table>
-        <thead>
-            <tr style="border-bottom:1px solid black;">
-      <th style="text-align:left; padding:4px; width:40%;">Item</th>
-      <th style="text-align:center; padding:4px; width:15%;">Qty</th>
-      <th style="text-align:center; padding:4px; width:20%;">Price</th>
-      <th style="text-align:right; padding:4px; width:25%;">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${productRows}
-        </tbody>
-      </table>
-    </div>
+  
 
+    <!-- Totals Section -->
     <div class="totals">
       ${Number(props.subTotal || 0)
-        ? `<div><span>Sub Total</span><span>${(Number(props.subTotal || 0)).toFixed(2)} LKR</span></div>`
+        ? `<div><span>Subtotal</span><span>${(Number(props.subTotal || 0)).toFixed(2)}</span></div>`
         : ""
       }
       ${Number(props.totalDiscount || 0)
-        ? `<div><span>Discount</span><span>${(Number(props.totalDiscount || 0)).toFixed(2)} LKR</span></div>`
-        : ""
-      }
-      ${Number(props.custom_discount || 0)
-        ? `<div><span>Custom Discount</span><span>${
-            (Number(props.custom_discount || 0)).toFixed(2)
-          } ${
-            props.custom_discount_type === "percent" ? "%" :
-            (props.custom_discount_type === "fixed" ? "LKR" : "")
+        ? `<div><span>Discount:</span><span>${
+            props.custom_discount_type === "percent" 
+              ? props.custom_discount + "%" 
+              : (Number(props.totalDiscount || 0)).toFixed(2)
           }</span></div>`
         : ""
       }
-      ${Number(props.total || 0)
-        ? `<div><span>Total</span><span>${(Number(props.total || 0)).toFixed(2)} LKR</span></div>`
+      ${Number(props.totalDiscount || 0)
+        ? `<div><span>Subtotal</span><span>${(Number(props.subTotal || 0) - Number(props.totalDiscount || 0)).toFixed(2)}</span></div>`
         : ""
       }
+      
+      <div class="dashed"></div>
+      
+      <div><span>Item:</span><span>${props.products.length}</span></div>
+      <div class="total-line"><span>TOTAL</span><span>${(Number(props.total || 0)).toFixed(2)}</span></div>
       ${Number(props.cash || 0)
-        ? `<div><span>Cash</span><span>${(Number(props.cash || 0)).toFixed(2)} LKR</span></div>`
+        ? `<div><span>Cash</span><span>${(Number(props.cash || 0)).toFixed(2)}</span></div>`
         : ""
       }
-      ${Number(props.balance || 0)
-        ? `<div><span>Balance</span><span>${(Number(props.balance || 0)).toFixed(2)} LKR</span></div>`
-        : ""
-      }
+      <div><span>${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})}</span><span>#${props.orderid || "0000"}</span></div>
     </div>
 
+   
+
+    <!-- Footer -->
     <div class="footer">
-      <p>Items can be exchanged within seven (7) days of purchase. No cash refunds will be provided for issued items.</p>
-      <p>THANK YOU COME AGAIN</p>
-      <p style="font-weight:bold;">Powered by JAAN Network Ltd.</p>
+      <p>THANK YOU,COME AGAIN</p>
     </div>
   </div>
 </body>
