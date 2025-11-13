@@ -1113,7 +1113,7 @@ const addCustomProduct = () => {
     quantity: parseInt(customProduct.value.quantity),
     selling_price: parseFloat(customProduct.value.price),
     apply_discount: false,
-    include_custom: true, // DEFAULT CHECKED NOW
+    include_custom: false, // DEFAULT CHECKED NOW
   };
 
   products.value.push(customItem);
@@ -1508,7 +1508,7 @@ const submitBarcode = async () => {
           ...fetchedProduct,
           quantity: 1,
           apply_discount: false,
-          include_custom: false, // DEFAULT CHECKED NOW
+          include_custom: true, // DEFAULT CHECKED NOW
         });
       }
 

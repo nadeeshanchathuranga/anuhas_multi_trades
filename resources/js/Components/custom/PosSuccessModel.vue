@@ -70,7 +70,7 @@ import {
   TransitionChild,
   TransitionRoot,
 } from "@headlessui/vue";
-import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
+import { computed, watch, nextTick, onBeforeUnmount } from "vue";
 import { usePage } from "@inertiajs/vue3";
 
 const emit = defineEmits(["update:open"]);
@@ -95,12 +95,11 @@ const props = defineProps({
   guide_cash: [Number, String],
   guide_name: String,
   guide_pending: [Boolean, Number],
-
-   returnItems: {
-        type: Array,
-        required: false,
-        default: () => [],
-    },
+  returnItems: {
+    type: Array,
+    required: false,
+    default: () => [],
+  },
 });
 
 const page = usePage();
@@ -108,8 +107,8 @@ const companyInfo = computed(() => page.props.companyInfo);
 
 // Close modal then reload after leave transition
 const closeAndRefresh = async () => {
-  emit("update:open", false);     // close modal
-  await nextTick();               // let leave animation start
+  emit("update:open", false); // close modal
+  await nextTick();           // let leave animation start
 };
 
 const onAfterLeave = () => {
@@ -151,60 +150,176 @@ onBeforeUnmount(() => {
 });
 
 const handlePrintReceipt = () => {
-  // Calculate totals
-  const subTotal = props.products.reduce(
-    (sum, product) => sum + parseFloat(product.selling_price) * product.quantity,
-    0
-  );
-  const customDiscount = Number(props.custom_discount || 0);
-  const totalDiscount = props.products
-    .reduce((total, item) => {
-      if (item.discount && item.discount > 0 && item.apply_discount == true) {
-        const discountAmount =
-          (parseFloat(item.selling_price) - parseFloat(item.discounted_price)) *
-          item.quantity;
-        return total + discountAmount;
-      }
-      return total;
-    }, 0)
-    .toFixed(2);
+  // --- BASE TOTALS FROM PARENT (POS PAGE) ---
+  const subTotalFromParent = Number(props.subTotal || 0);
+  const totalDiscountFromParent = Number(props.totalDiscount || 0); // normal discounts + coupon etc.
+  const totalFromParent = Number(props.total || 0);
+  const cashFromParent = Number(props.cash || 0);
+  const balanceFromParent = Number(props.balance || 0);
 
-  const total = subTotal - Number(totalDiscount) - customDiscount;
-  
+  // --- CUSTOM-ELIGIBLE SUBTOTAL (ONLY include_custom PRODUCTS) ---
+  const customEligibleSubtotal = props.products.reduce((sum, product) => {
+    if (!product.include_custom) return sum;
+
+    const unitPrice = props.isWholesale
+      ? Number(product.whole_price ?? product.selling_price ?? product.price ?? 0)
+      : Number(product.selling_price ?? product.price ?? 0);
+
+    return sum + unitPrice * Number(product.quantity || 0);
+  }, 0);
+
+  // --- ACTUAL CUSTOM DISCOUNT VALUE ---
+  const rawCustomValue = Number(props.custom_discount || 0);
+  let customDiscountValue = 0;
+
+  if (customEligibleSubtotal > 0 && rawCustomValue > 0) {
+    if (props.custom_discount_type === "percent") {
+      customDiscountValue = (customEligibleSubtotal * rawCustomValue) / 100;
+    } else {
+      customDiscountValue = Math.min(rawCustomValue, customEligibleSubtotal);
+    }
+  }
+
+  // --- SAFETY: IF parent total is missing, recompute fallback ---
+  const effectiveTotal =
+    totalFromParent ||
+    (subTotalFromParent - totalDiscountFromParent - customDiscountValue);
+
   const totalProductCount = props.products.length;
 
-     const productRows = props.products
-    .map((product) => {
-      return `
-        <tr>
-          <td colspan="3" style="padding: 4px 0; font-weight: bold;">
-            ${product.name}
-          </td>
-        </tr>
-        <tr style="border-bottom: 1px dashed #999;">
-          <td></td>
-          <td style="text-align: center; padding: 2px 0;">
-            ${product.selling_price} × ${product.quantity}
-            ${
-              product.discount > 0 && product.apply_discount
-                ? `<div style="font-weight: bold; font-size: 9px; background:black; color:white; text-align:center; margin-top:2px; border-radius:3px; display:inline-block; padding:0 4px;">
-                     ${product.discount}% OFF
-                   </div>`
-                : ""
-            }
-          </td>
-          <td style="text-align: right; padding: 2px 0;">
-            ${
-              product.discount > 0 && product.apply_discount
-                ? (product.selling_price * product.quantity * (1 - product.discount / 100)).toFixed(2)
-                : (product.selling_price * product.quantity).toFixed(2)
-            }
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+  // --- SPLIT PRODUCTS BY DISCOUNT ---
+  const discountedProducts = props.products.filter(
+    (p) => p.discount > 0 && p.apply_discount
+  );
+  const nonDiscountedProducts = props.products.filter(
+    (p) => !(p.discount > 0 && p.apply_discount)
+  );
 
+  // --- HELPER FUNCTION TO GENERATE PRODUCT ROWS ---
+  const generateProductRows = (productsArray) =>
+    productsArray
+      .map((product) => {
+        const unitPrice = props.isWholesale
+          ? Number(product.whole_price ?? product.selling_price ?? product.price ?? 0)
+          : Number(product.selling_price ?? product.price ?? 0);
+
+        const qty = Number(product.quantity || 0);
+        const hasLineDiscount = product.discount > 0 && product.apply_discount;
+        const discountPercent = Number(product.discount || 0);
+
+        // ORIGINAL (NO DISCOUNT) LINE TOTAL
+        const originalLineTotal = unitPrice * qty;
+
+        // FINAL TOTAL AFTER DISCOUNT
+        let finalLineTotal = originalLineTotal;
+        if (hasLineDiscount) {
+          if (product.discounted_price != null) {
+            finalLineTotal = Number(product.discounted_price) * qty;
+          } else {
+            finalLineTotal = unitPrice * qty * (1 - discountPercent / 100);
+          }
+        }
+
+        // DISCOUNT AMOUNT (PART 1)
+        const discountAmount = hasLineDiscount
+          ? originalLineTotal - finalLineTotal
+          : 0;
+
+        return `
+          <tr>
+            <td colspan="3" style="padding: 4px 0; font-weight: bold;">
+              ${product.name}
+              ${
+                product.include_custom
+                  ? `<span style="font-size: 8px; background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; margin-left:4px;">✓ Custom</span>`
+                  : ""
+              }
+            </td>
+          </tr>
+          <tr  >
+            <td></td>
+            <td style="text-align: center; padding: 2px 0;">
+              ${unitPrice.toFixed(2)} 
+              ${
+                hasLineDiscount
+                  ? `<div style="font-weight: bold; font-size: 9px; background:black; color:white; text-align:center; margin-top:2px; border-radius:3px; display:inline-block; padding:0 4px;">
+                       ${discountPercent}% OFF
+                     </div>`
+                  : ""
+              }
+            </td>
+
+
+
+
+ <td style="text-align: center; padding: 2px 0;">
+           ${qty}
+              
+            </td>
+
+            <td style="text-align: right; padding: 2px 0;">
+              ${
+                hasLineDiscount
+                  ? `
+                    <div style="font-size: 10px; text-decoration: line-through;">
+                      ${originalLineTotal.toFixed(2)}
+                    </div>
+                    <div style="font-size: 10px;">
+                      -${discountAmount.toFixed(2)}
+                    </div>
+                    <div style="font-weight: bold;">
+                      ${finalLineTotal.toFixed(2)}
+                    </div>
+                  `
+                  : `
+                    ${finalLineTotal.toFixed(2)}
+                  `
+              }
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+  // --- GENERATE DISCOUNTED & NON-DISCOUNTED PRODUCT TABLES ---
+  const discountedRowsHTML = discountedProducts.length
+    ? `<div class="section">
+         <div style="margin-bottom: 8px; font-weight: bold; font-size: 10px;">Discounted Items</div>
+         <table>
+           <thead>
+             <tr>
+               <th style="text-align:left; padding:4px;">Items</th>
+               <th style="text-align:center; padding:4px;">Price × Qty</th>
+               <th style="text-align:right; padding:4px;">Amount</th>
+             </tr>
+           </thead>
+           <tbody>
+             ${generateProductRows(discountedProducts)}
+           </tbody>
+         </table>
+       </div>`
+    : "";
+
+  const nonDiscountedRowsHTML = nonDiscountedProducts.length
+    ? `<div class="section">
+        
+         <table>
+           <thead>
+             <tr>
+               <th style="text-align:left; padding:4px;">Items</th>
+               <th style="text-align:center; padding:4px;">Price</th>
+               <th style="text-align:center; padding:4px;">Qty</th>
+               <th style="text-align:right; padding:4px;">Amount</th>
+             </tr>
+           </thead>
+           <tbody>
+             ${generateProductRows(nonDiscountedProducts)}
+           </tbody>
+         </table>
+       </div>`
+    : "";
+
+  // --- RECEIPT HTML ---
   const receiptHTML = `
 <!DOCTYPE html>
 <html lang="en">
@@ -234,42 +349,36 @@ const handlePrintReceipt = () => {
 <body>
   <div class="receipt-container">
     <!-- Header -->
-   <div class="header-line">
-  <div style="display:flex; justify-content:center; align-items:center;">
-    <!--
-    <div style="flex-shrink:0; text-align:right;">
-      <img src="/images/billlogo.jpg" alt="Company Logo" style="width:100px; height:100px; object-fit:contain; margin-top:15px;" />
+    <div class="header-line">
+      <div style="display:flex; justify-content:center; align-items:center;">
+        <div style="text-align:center; flex-grow:1; color:#000;">
+          ${
+            companyInfo?.value?.name
+              ? `<h1 style="margin:0; font-size:16px; font-weight:bold;">${companyInfo.value.name}</h1>`
+              : ""
+          }
+          ${
+            companyInfo?.value?.address
+              ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.address}</p>`
+              : ""
+          }
+          ${
+            (companyInfo?.value?.phone || companyInfo?.value?.phone2 || companyInfo?.value?.email)
+              ? `<p style="margin:2px 0; font-size:12px;">
+                   ${companyInfo.value.phone || ""}
+                   ${companyInfo.value.phone2 ? " | " + companyInfo.value.phone2 : ""}
+                   ${companyInfo.value.email ? " | " + companyInfo.value.email : ""}
+                 </p>`
+              : ""
+          }
+          ${
+            companyInfo?.value?.website
+              ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.website}</p>`
+              : ""
+          }
+        </div>
+      </div>
     </div>
-    -->
-    <div style="text-align:center; flex-grow:1; color:#000;">
-      ${
-        companyInfo?.value?.name
-          ? `<h1 style="margin:0; font-size:16px; font-weight:bold;">${companyInfo.value.name}</h1>`
-          : ""
-      }
-      ${
-        companyInfo?.value?.address
-          ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.address}</p>`
-          : ""
-      }
-      ${
-        (companyInfo?.value?.phone || companyInfo?.value?.phone2 || companyInfo?.value?.email)
-          ? `<p style="margin:2px 0; font-size:12px;">
-               ${companyInfo.value.phone || ""}
-               ${companyInfo.value.phone2 ? " | " + companyInfo.value.phone2 : ""}
-               ${companyInfo.value.email ? " | " + companyInfo.value.email : ""}
-             </p>`
-          : ""
-      }
-      ${
-        companyInfo?.value?.website
-          ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.website}</p>`
-          : ""
-      }
-    </div>
-  </div>
-</div>
-
 
     <div class="info-row">
       <div>
@@ -299,53 +408,56 @@ const handlePrintReceipt = () => {
       <p>Credit Bill: <small>${props.credit_bill ? "Yes" : "No"}</small></p>
     </div>
 
-    <div class="section">
-      <div style="margin-bottom: 8px; font-weight: bold; font-size: 10px;">
-        Total Products: ${totalProductCount}
-      </div>
-      <table>
-        <thead>
-          <tr>
-         <th style="text-align:left; padding:4px;">Items</th>
-            <th style="text-align:center; padding:4px;">Price × Qty</th>
-            <th style="text-align:right; padding:4px;">Amount</th>
-        </tr>
-        </thead>
-        <tbody>
-          ${productRows}
-        </tbody>
-      </table>
+    <!-- PRODUCT SECTIONS -->
+    <div style="margin-bottom: 8px; font-weight: bold; font-size: 10px;">
+      Total Products: ${totalProductCount}
     </div>
+    ${discountedRowsHTML}
+    ${nonDiscountedRowsHTML}
 
+    <!-- TOTALS -->
     <div class="totals">
-      ${Number(props.subTotal || 0)
-        ? `<div><span>Sub Total</span><span>${(Number(props.subTotal || 0)).toFixed(2)} LKR</span></div>`
-        : ""
+      ${
+        subTotalFromParent
+          ? `<div><span>Sub Total</span><span>${subTotalFromParent.toFixed(2)} LKR</span></div>`
+          : ""
       }
-      ${Number(props.totalDiscount || 0)
-        ? `<div><span>Discount</span><span>${(Number(props.totalDiscount || 0)).toFixed(2)} LKR</span></div>`
-        : ""
+      ${
+        totalDiscountFromParent
+          ? `<div><span>Discount</span><span>(${totalDiscountFromParent.toFixed(2)} LKR)</span></div>`
+          : ""
       }
-      ${Number(props.custom_discount || 0)
-        ? `<div><span>Custom Discount</span><span>${
-            (Number(props.custom_discount || 0)).toFixed(2)
-          } ${
-            props.custom_discount_type === "percent" ? "%" :
-            (props.custom_discount_type === "fixed" ? "LKR" : "")
-          }</span></div>`
-        : ""
+      ${
+        customEligibleSubtotal
+          ? `<div><span>Custom Items Sub Total</span><span>${customEligibleSubtotal.toFixed(2)} LKR</span></div>`
+          : ""
       }
-      ${Number(props.total || 0)
-        ? `<div><span>Total</span><span>${(Number(props.total || 0)).toFixed(2)} LKR</span></div>`
-        : ""
+      ${
+        customDiscountValue
+          ? `<div>
+               <span>Custom Discount</span>
+               <span>(${customDiscountValue.toFixed(2)} LKR)${
+                 props.custom_discount_type === "percent"
+                   ? ` (${rawCustomValue.toFixed(2)}%)`
+                   : ""
+               }</span>
+             </div>`
+          : ""
       }
-      ${Number(props.cash || 0)
-        ? `<div><span>Cash</span><span>${(Number(props.cash || 0)).toFixed(2)} LKR</span></div>`
-        : ""
+      ${
+        effectiveTotal
+          ? `<div><span>Total</span><span>${effectiveTotal.toFixed(2)} LKR</span></div>`
+          : ""
       }
-      ${Number(props.balance || 0)
-        ? `<div><span>Balance</span><span>${(Number(props.balance || 0)).toFixed(2)} LKR</span></div>`
-        : ""
+      ${
+        cashFromParent
+          ? `<div><span>Cash</span><span>${cashFromParent.toFixed(2)} LKR</span></div>`
+          : ""
+      }
+      ${
+        balanceFromParent
+          ? `<div><span>Balance</span><span>${balanceFromParent.toFixed(2)} LKR</span></div>`
+          : ""
       }
     </div>
 
