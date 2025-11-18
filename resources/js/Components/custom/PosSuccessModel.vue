@@ -227,11 +227,11 @@ const handlePrintReceipt = () => {
 
         return `
           <tr>
-            <td colspan="3" style="padding: 4px 0; font-weight: bold;">
+            <td colspan="3" style="padding: 4px 0;">
               ${product.name}
               ${
                 product.include_custom
-                  ? `<span style="font-size: 8px; background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; margin-left:4px;">✓ Custom</span>`
+                  ? `<span style="font-size: 8px; background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; margin-left:4px;">%</span>`
                   : ""
               }
             </td>
@@ -284,7 +284,7 @@ const handlePrintReceipt = () => {
   // --- GENERATE DISCOUNTED & NON-DISCOUNTED PRODUCT TABLES ---
   const discountedRowsHTML = discountedProducts.length
     ? `<div class="section">
-         <div style="margin-bottom: 8px; font-weight: bold; font-size: 10px;">Discounted Items</div>
+         <div style="margin-bottom: 5px; font-size: 10px;">Discounted Items</div>
          <table>
            <thead>
              <tr>
@@ -329,10 +329,10 @@ const handlePrintReceipt = () => {
 <title>Receipt</title>
 <style>
   @media print { body { margin:0; padding:0; -webkit-print-color-adjust: exact; } }
-  body { background:#fff; font-size:12px; font-family: Arial, sans-serif; margin:0; padding:10px; color:#000; font-weight:600; }
-  .section { margin-bottom:16px; padding-top:8px; border-top:1px solid #000; }
+  body { background:#fff; font-size:12px; font-family: Arial, sans-serif; margin:0; padding:10px; color:#000;   }
+  .section { margin-bottom:16px; padding-top:5px; border-top:1px solid #000; }
   .info-row { display:flex; justify-content:space-between; font-size:12px; margin-top:8px; }
-  .info-row p { margin:0; font-weight:bold; }
+  .info-row p { margin:0;}
   .info-row small { font-weight:normal; }
   table { width:100%; font-size:12px; border-collapse:collapse; margin-top:8px; }
   table th, table td { padding:6px 8px; }
@@ -341,7 +341,7 @@ const handlePrintReceipt = () => {
   table td:first-child { text-align:left; }
   .totals { border-top:1px solid #000; padding-top:8px; font-size:12px; }
   .totals div { display:flex; justify-content:space-between; margin-bottom:8px; }
-  .totals div:last-child { font-size:14px; font-weight:bold; }
+  .totals div:last-child { font-size:14px;  }
   .footer { text-align:center; font-size:10px; margin-top:16px; }
   .header-line { border-bottom:1px solid #000; padding-bottom:10px; margin-bottom:10px; }
 </style>
@@ -354,7 +354,7 @@ const handlePrintReceipt = () => {
         <div style="text-align:center; flex-grow:1; color:#000;">
           ${
             companyInfo?.value?.name
-              ? `<h1 style="margin:0; font-size:16px; font-weight:bold;">${companyInfo.value.name}</h1>`
+              ? `<h1 style="margin:0; font-size:16px;">${companyInfo.value.name}</h1>`
               : ""
           }
           ${
@@ -404,12 +404,12 @@ const handlePrintReceipt = () => {
 
     <div class="info-row">
       <p>Billing Type: <small>${props.isWholesale ? "Wholesale" : "Retail"}</small></p>
-      ${props.paymentMethod === "online" ? `<p>Payment Method: <small>Cheque</small></p>` : ""}
-      <p>Credit Bill: <small>${props.credit_bill ? "Yes" : "No"}</small></p>
+      ${props.paymentMethod ? `<p>Payment Method: <small>${props.paymentMethod.charAt(0).toUpperCase() + props.paymentMethod.slice(1)}</small></p>` : ""}
+      ${props.credit_bill ? `<p>Credit Bill: <small>Yes</small></p>` : ""}
     </div>
 
     <!-- PRODUCT SECTIONS -->
-    <div style="margin-bottom: 8px; font-weight: bold; font-size: 10px;">
+    <div style="margin-bottom: 5px;font-size: 10px;">
       Total Products: ${totalProductCount}
     </div>
     ${discountedRowsHTML}
@@ -464,7 +464,7 @@ const handlePrintReceipt = () => {
     <div class="footer">
       <p>Items can be exchanged within seven (7) days of purchase. No cash refunds will be provided for issued items.</p>
       <p>THANK YOU COME AGAIN</p>
-      <p style="font-weight:bold;">Powered by JAAN Network Ltd.</p>
+      <p>Powered by JAAN Network Ltd.</p>
     </div>
   </div>
 </body>
