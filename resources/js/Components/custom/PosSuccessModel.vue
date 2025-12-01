@@ -328,22 +328,22 @@ const handlePrintReceipt = () => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Receipt</title>
 <style>
-  @media print { body { margin:0; padding:0; -webkit-print-color-adjust: exact; } }
-  body { background:#fff; font-size:12px; font-family: Arial, sans-serif; margin:0; padding:10px; color:#000;   }
-  .section { margin-bottom:16px; padding-top:5px; border-top:1px solid #000; }
-  .info-row { display:flex; justify-content:space-between; font-size:12px; margin-top:8px; }
-  .info-row p { margin:0;}
-  .info-row small { font-weight:normal; }
-  table { width:100%; font-size:12px; border-collapse:collapse; margin-top:8px; }
-  table th, table td { padding:6px 8px; }
+  @media print { body { margin:0; padding:0; -webkit-print-color-adjust: none; background: white !important; } }
+  body { background: white; font-size: 9px; font-family: Arial, sans-serif; margin:0; padding:5px; color:#000; }
+  .section { margin-bottom:8px; padding-top:3px; border-top:1px solid #000; }
+  .info-row { display:flex; justify-content:space-between; font-size:9px; margin-top:4px; }
+  .info-row p { margin:0; font-size:9px; }
+  .info-row small { font-weight:normal; font-size:8px; }
+  table { width:100%; font-size:8px; border-collapse:collapse; margin-top:4px; }
+  table th, table td { padding:3px 4px; }
   table th { text-align:left; }
   table td { text-align:right; }
   table td:first-child { text-align:left; }
-  .totals { border-top:1px solid #000; padding-top:8px; font-size:12px; }
-  .totals div { display:flex; justify-content:space-between; margin-bottom:8px; }
-  .totals div:last-child { font-size:14px;  }
-  .footer { text-align:center; font-size:10px; margin-top:16px; }
-  .header-line { border-bottom:1px solid #000; padding-bottom:10px; margin-bottom:10px; }
+  .totals { border-top:1px solid #000; padding-top:4px; font-size:9px; }
+  .totals div { display:flex; justify-content:space-between; margin-bottom:4px; }
+  .totals div:last-child { font-size:10px; font-weight:bold; }
+  .footer { text-align:center; font-size:8px; margin-top:8px; }
+  .header-line { border-bottom:1px solid #000; padding-bottom:5px; margin-bottom:5px; }
 </style>
 </head>
 <body>
@@ -354,17 +354,17 @@ const handlePrintReceipt = () => {
         <div style="text-align:center; flex-grow:1; color:#000;">
           ${
             companyInfo?.value?.name
-              ? `<h1 style="margin:0; font-size:16px;">${companyInfo.value.name}</h1>`
+              ? `<h1 style="margin:0; font-size:11px; font-weight:bold;">${companyInfo.value.name}</h1>`
               : ""
           }
           ${
             companyInfo?.value?.address
-              ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.address}</p>`
+              ? `<p style="margin:1px 0; font-size:8px;">${companyInfo.value.address}</p>`
               : ""
           }
           ${
             (companyInfo?.value?.phone || companyInfo?.value?.phone2 || companyInfo?.value?.email)
-              ? `<p style="margin:2px 0; font-size:12px;">
+              ? `<p style="margin:1px 0; font-size:8px;">
                    ${companyInfo.value.phone || ""}
                    ${companyInfo.value.phone2 ? " | " + companyInfo.value.phone2 : ""}
                    ${companyInfo.value.email ? " | " + companyInfo.value.email : ""}
@@ -373,7 +373,7 @@ const handlePrintReceipt = () => {
           }
           ${
             companyInfo?.value?.website
-              ? `<p style="margin:2px 0; font-size:12px;">${companyInfo.value.website}</p>`
+              ? `<p style="margin:1px 0; font-size:8px;">${companyInfo.value.website}</p>`
               : ""
           }
         </div>
@@ -434,9 +434,9 @@ const handlePrintReceipt = () => {
       }
       ${
         customDiscountValue
-          ? `<div>
+          ? `<div style="font-size:9px;">
                <span>Custom Discount</span>
-               <span>(${customDiscountValue.toFixed(2)} LKR)${
+               <span style="white-space:nowrap;">(${customDiscountValue.toFixed(2)} LKR)${
                  props.custom_discount_type === "percent"
                    ? ` (${rawCustomValue.toFixed(2)}%)`
                    : ""
