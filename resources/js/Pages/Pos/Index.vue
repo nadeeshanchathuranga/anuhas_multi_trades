@@ -260,7 +260,12 @@
                             </p>
 
                             <p class="text-xl font-bold text-gray-900 mt-1">
-                              {{ ((isWholesale ? item.whole_price : item.selling_price) * item.quantity).toFixed(2) }} LKR
+                              <span v-if="item.apply_discount">
+                                {{ ((((isWholesale ? item.whole_price : item.selling_price) || 0) * (1 - (isWholesale ? item.wholesale_discount : item.discount) / 100)) * item.quantity).toFixed(2) }} LKR
+                              </span>
+                              <span v-else>
+                                {{ ((isWholesale ? item.whole_price : item.selling_price) * item.quantity).toFixed(2) }} LKR
+                              </span>
                             </p>
                           </div>
                         </div>
@@ -1113,7 +1118,12 @@ const addCustomProduct = () => {
     quantity: parseInt(customProduct.value.quantity),
     selling_price: parseFloat(customProduct.value.price),
     apply_discount: false,
-    include_custom: false, // Changed to false so checkboxes don't auto-tick
+    include_custom: false,
+    discount: 0,
+    wholesale_discount: 0,
+    discounted_price: parseFloat(customProduct.value.price),
+    final_whole_price: parseFloat(customProduct.value.price),
+    whole_price: parseFloat(customProduct.value.price),
   };
 
   products.value.push(customItem);
@@ -1377,11 +1387,22 @@ const subtotal = computed(() => {
 
 const totalDiscount = computed(() => {
   const productDiscount = products.value.reduce((t, item) => {
-    if (item.discount && item.discount > 0 && item.apply_discount === true) {
-      const unitBase = parseFloat(item.selling_price ?? item.price) || 0;
-      const unitDisc = parseFloat(item.discounted_price ?? unitBase) || 0;
-      const diff = (unitBase - unitDisc) * (Number(item.quantity) || 0);
-      return t + Math.max(diff, 0);
+    // Check if discount should be applied
+    const discountPercent = isWholesale.value ? (item.wholesale_discount || 0) : (item.discount || 0);
+    
+    if (discountPercent && discountPercent > 0 && item.apply_discount === true) {
+      // Get the base price
+      const basePrice = isWholesale.value 
+        ? parseFloat(item.whole_price || item.selling_price || item.price) 
+        : parseFloat(item.selling_price || item.price);
+      
+      // Calculate discount amount per unit
+      const discountPerUnit = (basePrice * discountPercent) / 100;
+      
+      // Total discount for all quantities
+      const totalItemDiscount = discountPerUnit * (Number(item.quantity) || 0);
+      
+      return t + Math.max(totalItemDiscount, 0);
     }
     return t;
   }, 0);
@@ -1389,7 +1410,20 @@ const totalDiscount = computed(() => {
   const couponDiscount = appliedCoupon.value ? Number(appliedCoupon.value.discount) : 0;
   const orderLevelDiscount = discount.value ? parseFloat(discount.value) : 0;
 
-  return (productDiscount + couponDiscount + orderLevelDiscount).toFixed(2);
+  // Calculate custom discount amount
+  const customValueInput = parseFloat(custom_discount.value) || 0;
+  const eligibleSub = parseFloat(eligibleCustomSubtotal.value) || 0;
+
+  let customDiscountAmount = 0;
+  if (eligibleSub > 0 && customValueInput > 0) {
+    if (custom_discount_type.value === "percent") {
+      customDiscountAmount = (eligibleSub * customValueInput) / 100;
+    } else {
+      customDiscountAmount = Math.min(customValueInput, eligibleSub);
+    }
+  }
+
+  return (productDiscount + couponDiscount + orderLevelDiscount + customDiscountAmount).toFixed(2);
 });
 
 // NEW: subtotal of products that are ticked for Custom Discount
@@ -1410,25 +1444,13 @@ const validateCustomDiscount = () => {
   }
 };
 
-// UPDATED: apply custom discount ONLY on eligibleCustomSubtotal
+// UPDATED: totalDiscount now includes custom discount, so no need to subtract it again
 const total = computed(() => {
   const subtotalValue = parseFloat(subtotal.value) || 0;
   const discountValue = parseFloat(totalDiscount.value) || 0;
   const returnAmount = parseFloat(returnBillTotal.value) || 0;
 
-  const customValueInput = parseFloat(custom_discount.value) || 0;
-  const eligibleSub = parseFloat(eligibleCustomSubtotal.value) || 0;
-
-  let customValue = 0;
-  if (eligibleSub > 0 && customValueInput > 0) {
-    if (custom_discount_type.value === "percent") {
-      customValue = (eligibleSub * customValueInput) / 100;
-    } else {
-      customValue = Math.min(customValueInput, eligibleSub);
-    }
-  }
-
-  const grand = subtotalValue - discountValue - customValue - returnAmount;
+  const grand = subtotalValue - discountValue - returnAmount;
   return grand.toFixed(2);
 });
 
@@ -1508,7 +1530,11 @@ const submitBarcode = async () => {
           ...fetchedProduct,
           quantity: 1,
           apply_discount: false,
-          include_custom: false, // Changed to false so checkboxes don't auto-tick
+          include_custom: false,
+          discount: fetchedProduct.discount || 0,
+          wholesale_discount: fetchedProduct.wholesale_discount || 0,
+          discounted_price: fetchedProduct.discounted_price || fetchedProduct.selling_price || 0,
+          final_whole_price: fetchedProduct.final_whole_price || fetchedProduct.whole_price || 0,
         });
       }
 
@@ -1700,7 +1726,11 @@ const handleSelectedProducts = (selectedProducts) => {
         ...fetchedProduct,
         quantity: 1,
         apply_discount: false,
-        include_custom: false, // Changed to false so checkboxes don't auto-tick
+        include_custom: false,
+        discount: fetchedProduct.discount || 0,
+        wholesale_discount: fetchedProduct.wholesale_discount || 0,
+        discounted_price: fetchedProduct.discounted_price || fetchedProduct.selling_price || 0,
+        final_whole_price: fetchedProduct.final_whole_price || fetchedProduct.whole_price || 0,
       });
     }
   });
@@ -1908,7 +1938,12 @@ const handlePrintoutsSelected = (selectedPrintouts) => {
       quantity: parseInt(printout.quantity),
       selling_price: parseFloat(printout.price),
       apply_discount: false,
-      include_custom: false, // Changed to false so checkboxes don't auto-tick
+      include_custom: false,
+      discount: 0,
+      wholesale_discount: 0,
+      discounted_price: parseFloat(printout.price),
+      final_whole_price: parseFloat(printout.price),
+      whole_price: parseFloat(printout.price),
     };
     products.value.push(printoutItem);
   });
