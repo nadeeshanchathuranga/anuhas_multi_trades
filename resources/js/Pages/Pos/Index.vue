@@ -1113,7 +1113,7 @@ const addCustomProduct = () => {
     quantity: parseInt(customProduct.value.quantity),
     selling_price: parseFloat(customProduct.value.price),
     apply_discount: false,
-    include_custom: false, // DEFAULT CHECKED NOW
+    include_custom: false, // Changed to false so checkboxes don't auto-tick
   };
 
   products.value.push(customItem);
@@ -1508,7 +1508,7 @@ const submitBarcode = async () => {
           ...fetchedProduct,
           quantity: 1,
           apply_discount: false,
-          include_custom: true, // DEFAULT CHECKED NOW
+          include_custom: false, // Changed to false so checkboxes don't auto-tick
         });
       }
 
@@ -1696,11 +1696,11 @@ const handleSelectedProducts = (selectedProducts) => {
     if (existing) {
       existing.quantity += 1;
     } else {
-      products.value.push({
+    products.value.push({
         ...fetchedProduct,
         quantity: 1,
         apply_discount: false,
-        include_custom: false, // DEFAULT CHECKED NOW
+        include_custom: false, // Changed to false so checkboxes don't auto-tick
       });
     }
   });
@@ -1908,7 +1908,7 @@ const handlePrintoutsSelected = (selectedPrintouts) => {
       quantity: parseInt(printout.quantity),
       selling_price: parseFloat(printout.price),
       apply_discount: false,
-      include_custom: false, // DEFAULT CHECKED NOW
+      include_custom: false, // Changed to false so checkboxes don't auto-tick
     };
     products.value.push(printoutItem);
   });
