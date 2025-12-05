@@ -12,6 +12,8 @@ use App\Models\Printout;
 use App\Models\CustomProduct;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\CreditBill;
+use App\Models\CreditBillItem;
 use App\Models\ReturnItem;
 use App\Models\ReturnReason;
 use App\Models\Size;
@@ -251,8 +253,8 @@ public function submit(Request $request)
         'userId'   => 'required|integer|exists:users,id',
         'orderid'  => 'required|string|max:50',
 
-        // accept cheque in addition to cash/card
-        'paymentMethod' => 'required|string|in:cash,card,cheque',
+        // accept cheque in addition to cash/card/credit
+        'paymentMethod' => 'required|string|in:cash,card,cheque,credit',
         'cash' => 'nullable|numeric|min:0',
 
         'isWholesale' => 'nullable|boolean',
@@ -450,8 +452,10 @@ public function submit(Request $request)
             ]);
         }
 
-        // ---- SALE CREATION ----
-        $saleData = [
+        // ---- SALE/CREDIT BILL CREATION ----
+        $isCreditBill = (bool)($validated['credit_bill'] ?? false);
+        
+        $billData = [
             'customer_id'    => $customer?->id,
             'employee_id'    => $validated['employee_id'] ?? null,
             'user_id'        => $validated['userId'],
@@ -464,75 +468,118 @@ public function submit(Request $request)
             'cash'           => (float)($validated['cash'] ?? 0),
             'is_whole'       => $isWhole,
             'custom_discount_type' => $customType,
-            'custom_discount'      => $validated['custom_discount'] ?? 0, // store the raw value entered
-            'credit_bill'    => (bool)($validated['credit_bill'] ?? false),
+            'custom_discount'      => $validated['custom_discount'] ?? 0,
         ];
 
-        // Optionally attach cheque_id if your 'sales' table has it
-        if ($cheque && \Schema::hasColumn('sales', 'cheque_id')) {
-            $saleData['cheque_id'] = $cheque->id;
+        // Optionally attach cheque_id
+        if ($cheque) {
+            $billData['cheque_id'] = $cheque->id;
         }
 
-        /** @var \App\Models\Sale $sale */
-        $sale = Sale::create($saleData);
+        // Create either CreditBill or Sale based on checkbox
+        if ($isCreditBill) {
+            /** @var \App\Models\CreditBill $bill */
+            $bill = CreditBill::create($billData);
+            $billType = 'credit';
+        } else {
+            /** @var \App\Models\Sale $bill */
+            $saleData = $billData;
+            $saleData['credit_bill'] = false;
+            $bill = Sale::create($saleData);
+            $billType = 'sale';
+        }
 
-        // ---- SALE ITEMS & STOCK MOVES ----
+        // ---- BILL ITEMS & STOCK MOVES ----
         foreach ($products as $p) {
             $itemType = $p['type'] ?? 'product';
             $qty = (float)$p['quantity'];
             $unitPrice = (float)$p['__resolved_unit_price'];
             
             if ($itemType === 'custom') {
-                // Handle custom product sale item
+                // Handle custom product item
                 // First, create the custom product record
                 $customProduct = CustomProduct::create([
                     'name' => $p['__custom_name'],
                     'price' => $unitPrice,
                 ]);
                 
-                SaleItem::create([
-                    'sale_id'           => $sale->id,
-                    'product_id'        => null,
-                    'printout_id'       => null,
-                    'custom_product_id' => $customProduct->id,
-                    'quantity'          => $qty,
-                    'unit_price'        => $unitPrice,
-                    'total_price'       => $qty * $unitPrice,
-                ]);
+                if ($billType === 'credit') {
+                    CreditBillItem::create([
+                        'credit_bill_id'    => $bill->id,
+                        'product_id'        => null,
+                        'printout_id'       => null,
+                        'custom_product_id' => $customProduct->id,
+                        'quantity'          => $qty,
+                        'unit_price'        => $unitPrice,
+                        'total_price'       => $qty * $unitPrice,
+                    ]);
+                } else {
+                    SaleItem::create([
+                        'sale_id'           => $bill->id,
+                        'product_id'        => null,
+                        'printout_id'       => null,
+                        'custom_product_id' => $customProduct->id,
+                        'quantity'          => $qty,
+                        'unit_price'        => $unitPrice,
+                        'total_price'       => $qty * $unitPrice,
+                    ]);
+                }
                 
                 // No stock to decrement for custom products
                 
             } elseif ($itemType === 'printout') {
-                // Handle printout sale item
+                // Handle printout item
                 $printoutModel = $p['__model'];
                 
-                SaleItem::create([
-                    'sale_id'     => $sale->id,
-                    'product_id'  => null,
-                    'printout_id' => $printoutModel->id,
-                    'quantity'    => $qty,
-                    'unit_price'  => $unitPrice,
-                    'total_price' => $qty * $unitPrice,
-                ]);
+                if ($billType === 'credit') {
+                    CreditBillItem::create([
+                        'credit_bill_id' => $bill->id,
+                        'product_id'     => null,
+                        'printout_id'    => $printoutModel->id,
+                        'quantity'       => $qty,
+                        'unit_price'     => $unitPrice,
+                        'total_price'    => $qty * $unitPrice,
+                    ]);
+                } else {
+                    SaleItem::create([
+                        'sale_id'        => $bill->id,
+                        'product_id'     => null,
+                        'printout_id'    => $printoutModel->id,
+                        'quantity'       => $qty,
+                        'unit_price'     => $unitPrice,
+                        'total_price'    => $qty * $unitPrice,
+                    ]);
+                }
 
                 // Printout stock is unlimited - no decrement needed
-                // $printoutModel->decrement('quantity', $qty);
+                
             } else {
-                // Handle regular product sale item
+                // Handle regular product item
                 $productModel = $p['__model'];
 
-                SaleItem::create([
-                    'sale_id'     => $sale->id,
-                    'product_id'  => $productModel->id,
-                    'quantity'    => $qty,
-                    'unit_price'  => $unitPrice,
-                    'total_price' => $qty * $unitPrice,
-                ]);
+                if ($billType === 'credit') {
+                    CreditBillItem::create([
+                        'credit_bill_id' => $bill->id,
+                        'product_id'     => $productModel->id,
+                        'quantity'       => $qty,
+                        'unit_price'     => $unitPrice,
+                        'total_price'    => $qty * $unitPrice,
+                    ]);
+                } else {
+                    SaleItem::create([
+                        'sale_id'     => $bill->id,
+                        'product_id'  => $productModel->id,
+                        'quantity'    => $qty,
+                        'unit_price'  => $unitPrice,
+                        'total_price' => $qty * $unitPrice,
+                    ]);
+                }
 
+                // Create stock transaction (for both credit and regular sales)
                 StockTransaction::create([
                     'product_id'        => $productModel->id,
-                    'sale_id'           => $sale->id,
-                    'transaction_type'  => 'Sold',
+                    'sale_id'           => $billType === 'sale' ? $bill->id : null,
+                    'transaction_type'  => $billType === 'credit' ? 'Credit Bill' : 'Sold',
                     'quantity'          => $qty,
                     'transaction_date'  => now(),
                     'supplier_id'       => $productModel->supplier_id ?? null,
@@ -544,60 +591,59 @@ public function submit(Request $request)
 
          foreach ($returnItems as $item) {
                     // You may want to validate the sale_item_id and product_id exist
-               
-                    $unitPrice = $item['unit_price'] ?? 0;
-                    $quantity = $item['quantity'] ?? 0;
-                    $totalPrice = $quantity * $unitPrice;
-                    ReturnItem::create([
-                        'sale_id' => $sale->id,
-                        'customer_id' => $customer ? $customer->id : null,
-                        'product_id' => $item['product_id'],
-                        'quantity' => $item['quantity'],
-                        'reason' => $item['reason'] ?? '',
-                        'unit_price' =>$unitPrice,
-                        'return_date' => $item['return_date'] ?? now()->toDateString(),
-                        'total_price' => $totalPrice,
-                      
-                    ]);
-                    
+                    // Return items only applicable to sales, not credit bills
+                    if ($billType === 'sale') {
+                        $unitPrice = $item['unit_price'] ?? 0;
+                        $quantity = $item['quantity'] ?? 0;
+                        $totalPrice = $quantity * $unitPrice;
+                        ReturnItem::create([
+                            'sale_id' => $bill->id,
+                            'customer_id' => $customer ? $customer->id : null,
+                            'product_id' => $item['product_id'],
+                            'quantity' => $item['quantity'],
+                            'reason' => $item['reason'] ?? '',
+                            'unit_price' =>$unitPrice,
+                            'return_date' => $item['return_date'] ?? now()->toDateString(),
+                            'total_price' => $totalPrice,
+                        ]);
+                        
 
-                         // For return items, we need to increase stock
-                $returnedProduct = Product::find($item['product_id']);
-                if ($returnedProduct) {
-                    $returnedProduct->update([
-                        'stock_quantity' => $returnedProduct->stock_quantity + $item['quantity']
-                    ]); 
+                        // For return items, we need to increase stock
+                        $returnedProduct = Product::find($item['product_id']);
+                        if ($returnedProduct) {
+                            $returnedProduct->update([
+                                'stock_quantity' => $returnedProduct->stock_quantity + $item['quantity']
+                            ]); 
 
-                    StockTransaction::create([
-                        'product_id' => $item['product_id'],
-                        'transaction_type' => 'Returned',
-                        'quantity' => $item['quantity'],
-                        'transaction_date' => now(),
-                        'supplier_id' => $returnedProduct->supplier_id ?? null,
-                    ]);
-
-       
+                            StockTransaction::create([
+                                'product_id' => $item['product_id'],
+                                'transaction_type' => 'Returned',
+                                'quantity' => $item['quantity'],
+                                'transaction_date' => now(),
+                                'supplier_id' => $returnedProduct->supplier_id ?? null,
+                            ]);
+                        }
+                    }
                 }
-
-            }
 
         DB::commit();
 
         return response()->json([
-            'message' => 'Sale recorded successfully!',
-            'sale_id' => $sale->id
+            'message' => $billType === 'credit' ? 'Credit bill recorded successfully!' : 'Sale recorded successfully!',
+            'sale_id' => $bill->id,
+            'bill_type' => $billType
         ], 201);
-
-    } catch (\Throwable $e) {
+    }
+    catch (\Throwable $e) {
         DB::rollBack();
 
-        \Log::error('Sale submission error: ' . $e->getMessage(), [
+        \Log::error('Sale/Credit Bill submission error: ' . $e->getMessage(), [
             'trace' => $e->getTraceAsString(),
             'request_data' => $request->all()
         ]);
 
         return response()->json([
-            'message' => 'Failed to record sale.',
+            'message' => 'Failed to record ' . ($isCreditBill ?? false ? 'credit bill' : 'sale') . '.',
             'error'   => config('app.debug') ? $e->getMessage() : 'Server error occurred. Please try again.',
         ], 500);
     }

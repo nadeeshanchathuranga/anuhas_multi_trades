@@ -517,7 +517,7 @@
                 <!-- Payment Methods -->
                 <div class="w-full bg-white p-5 rounded-xl border border-black shadow-sm">
                   <p class="text-xl font-semibold text-center mb-3 text-gray-900">Payment Method</p>
-                  <div class="flex justify-center gap-4">
+                  <div class="flex justify-center gap-4 flex-wrap">
                     <div
                       @click="selectedPaymentMethod = 'cash'"
                       :class="[
@@ -549,6 +549,17 @@
                     >
                       <img src="/images/bank-check.png" alt="Cheque" class="w-12" />
                       <span class="mt-1 text-sm md:text-base">Cheque</span>
+                    </div>
+
+                    <div
+                      @click="selectedPaymentMethod = 'credit'"
+                      :class="[
+                        'cursor-pointer w-[96px] p-2 border border-black rounded-lg flex flex-col items-center transition',
+                        selectedPaymentMethod === 'credit' ? 'bg-orange-300/70 font-bold shadow' : 'hover:bg-gray-100'
+                      ]"
+                    >
+                      <img src="/images/money-stack.png" alt="Credit" class="w-12" />
+                      <span class="mt-1 text-sm md:text-base">Credit</span>
                     </div>
                   </div>
                 </div>
@@ -1217,6 +1228,11 @@ const focusBarcodeField = () => {
 const submitOrder = async () => {
   if (isSubmitting.value) return;
   isSubmitting.value = true;
+
+  // Automatically set credit_bill to true when payment method is 'credit'
+  if (selectedPaymentMethod.value === 'credit') {
+    credit_bill.value = true;
+  }
 
   if (parseFloat(balance.value) < 0) {
     isAlertModalOpen.value = true;
