@@ -302,6 +302,8 @@ const handlePrintReceipt = () => {
       <span>Billing Type : ${props.isWholesale ? "Wholesale" : "Retail"}</span>
     </div>
     
+    
+    
     <div class="dotted-line"></div>
 
     <!-- PRODUCT TABLE -->
@@ -334,6 +336,16 @@ const handlePrintReceipt = () => {
       ${
         effectiveTotal
           ? `<div class="totals-row bold"><span>Total</span><span>${effectiveTotal.toFixed(2)}</span></div>`
+          : ""
+      }
+      ${
+        props.cash !== undefined && props.cash !== null
+          ? `<div class="totals-row"><span>Cash</span><span>${parseFloat(props.cash).toFixed(2)}</span></div>`
+          : ""
+      }
+      ${
+        props.balance !== undefined && props.balance !== null
+          ? `<div class="totals-row"><span>Balance</span><span>${parseFloat(props.balance).toFixed(2)}</span></div>`
           : ""
       }
     </div>
