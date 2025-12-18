@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use App\Models\Product;
 use App\Models\Report;
 use App\Models\Sale;
+use App\Models\CreditBill;
 use App\Models\ExpenseNew;
 use App\Models\SaleItem;
 use App\Models\StockTransaction;
@@ -63,6 +64,39 @@ class ReportController extends Controller
             $applyCreatedWindow($salesQuery);
         }
 
+        // -------- Credit Bills (filter by payment dates, not creation date) --------
+        $creditBillsQuery = \App\Models\CreditBill::with(['customer', 'employee', 'payments' => function($query) use ($from, $to) {
+            // Filter payments by date range
+            if ($from) {
+                $query->where('created_at', '>=', $from);
+            }
+            if ($to) {
+                $query->where('created_at', '<=', $to);
+            }
+        }]);
+
+        // Only include credit bills that have payments in the date range
+        if ($from || $to) {
+            $creditBillsQuery->whereHas('payments', function($query) use ($from, $to) {
+                if ($from) {
+                    $query->where('created_at', '>=', $from);
+                }
+                if ($to) {
+                    $query->where('created_at', '<=', $to);
+                }
+            });
+        } else {
+            // If no date filter, only show bills with any payment
+            $creditBillsQuery->where('paid_amount', '>', 0);
+        }
+
+        $creditBills = $creditBillsQuery->orderBy('created_at', 'desc')->get();
+
+        // Recalculate paid_amount based on filtered payments
+        $creditBills->each(function($bill) {
+            $bill->filtered_paid_amount = $bill->payments->sum('amount');
+        });
+
         // For qty per product (respect same window through parent sale)
         $salesQuantitiesQuery = SaleItem::query()->whereHas('sale', function ($q) use ($applyCreatedWindow, $from, $to) {
             if ($from || $to) $applyCreatedWindow($q);
@@ -100,10 +134,19 @@ class ReportController extends Controller
             }
         }
 
-        // Payment totals (gross)
+        // Payment totals - for regular sales use full amount, for credit bills use paid amount only
         $paymentMethodTotals = $sales->groupBy('payment_method')->map(
             fn($g) => (float) $g->sum('total_amount')
         )->toArray();
+
+        // Add credit bill payments to payment method totals
+        // Use actual payment methods from the filtered payments
+        foreach ($creditBills as $cb) {
+            foreach ($cb->payments as $payment) {
+                $method = $payment->payment_method;
+                $paymentMethodTotals[$method] = ($paymentMethodTotals[$method] ?? 0) + (float) $payment->amount;
+            }
+        }
 
         // Employee sales (NET)
         $employeeSalesSummary = [];
@@ -120,14 +163,33 @@ class ReportController extends Controller
             $employeeSalesSummary[$name]['Total Sales Amount'] += ($gross - $prodDisc - $customDisc);
         }
 
-        // Overall stats
+        // Overall stats from regular sales
         $totalSaleAmount         = (float) $sales->sum('total_amount');
         $totalCost               = (float) $sales->sum('total_cost');
         $totalProductDiscountLkr = (float) $sales->sum('discount');
         $totalCustomDiscountLkr  = (float) $sales->reduce(fn($c, $s) => $c + $customDiscountToLkr($s), 0.0);
-        $netProfit               = $totalSaleAmount - $totalCost - ($totalProductDiscountLkr + $totalCustomDiscountLkr);
-        $totalTransactions       = $sales->count();
-        $averageTransactionValue = $totalTransactions > 0 ? ($totalSaleAmount / $totalTransactions) : 0;
+
+        // Credit bills - only count payments made in the filtered date range
+        $totalCreditBillPaidAmount = (float) $creditBills->sum('filtered_paid_amount');
+
+        // Calculate the proportion of payment to apply costs and discounts
+        foreach ($creditBills as $cb) {
+            if ($cb->total_amount > 0) {
+                // Use filtered paid amount (payments in date range)
+                $paymentRatio = $cb->filtered_paid_amount / $cb->total_amount;
+                // Only include proportional cost and discount based on what's been paid in this period
+                $totalCost += ($cb->total_cost * $paymentRatio);
+                $totalProductDiscountLkr += ($cb->discount * $paymentRatio);
+                $totalCustomDiscountLkr += ($customDiscountToLkr($cb) * $paymentRatio);
+            }
+        }
+
+        // Net profit = (regular sales + credit bill payments) - costs - discounts
+        $totalRevenue = $totalSaleAmount + $totalCreditBillPaidAmount;
+        $netProfit = $totalRevenue - $totalCost - ($totalProductDiscountLkr + $totalCustomDiscountLkr);
+
+        $totalTransactions       = $sales->count() + $creditBills->count();
+        $averageTransactionValue = $totalTransactions > 0 ? ($totalRevenue / $totalTransactions) : 0;
 
         // Distinct customers (same filter)
         $totalCustomer = (clone $salesQuery)->distinct('customer_id')->count('customer_id');
@@ -154,7 +216,7 @@ class ReportController extends Controller
         $stockTransactionsReturn = StockTransaction::with('product')
             ->where('transaction_type', 'Returned')
             ->get();
-        
+
         if ($startDateRaw && $endDateRaw) {
             $stockTransactionsReturn = StockTransaction::with('product')
                 ->where('transaction_type', 'Returned')
@@ -165,8 +227,11 @@ class ReportController extends Controller
         return Inertia::render('Reports/Index', [
             'products'                  => $products,
             'sales'                     => $sales,
+            'creditBills'               => $creditBills,
 
             'totalSaleAmount'           => round($totalSaleAmount, 2),
+            'totalCreditBillPaidAmount' => round($totalCreditBillPaidAmount, 2),
+            'totalRevenue'              => round($totalRevenue, 2),
             'totalDiscountLkr'          => round($totalProductDiscountLkr, 2),
             'totalCustomDiscountLkr'    => round($totalCustomDiscountLkr, 2),
             'netProfit'                 => round($netProfit, 2),
@@ -257,5 +322,5 @@ class ReportController extends Controller
     }
 
      // Add this NEW method
-   
+
 }

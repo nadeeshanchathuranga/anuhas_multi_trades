@@ -232,7 +232,7 @@ public function serviceSubmit(Request $request)
 public function submit(Request $request)
 {
 
-    
+
     // Normalize UI label "online" -> backend "cheque" (comment this line if your UI already sends 'cheque')
     if ($request->input('paymentMethod') === 'online') {
         $request->merge(['paymentMethod' => 'cheque']);
@@ -292,7 +292,7 @@ public function submit(Request $request)
     ]);
 
     $products = $validated['products'];
-    
+
         $products = $request->input('products');
       $returnItems = $request->input('return_items', []);
     $isWhole  = (bool) ($validated['isWholesale'] ?? false);
@@ -303,23 +303,23 @@ public function submit(Request $request)
 
     foreach ($products as &$p) {
         $itemType = $p['type'] ?? 'product';
-        
+
         if ($itemType === 'custom') {
             // Handle custom product items (no stock check, no existing record)
             $qty = (float)($p['quantity'] ?? 0);
-            
+
             // Use the price provided from frontend
             $unitPrice = (float)($p['price'] ?? 0);
             $costPrice = 0; // Custom products don't have cost price
-            
+
             $p['__resolved_unit_price'] = $unitPrice;
             $p['__resolved_cost_price'] = $costPrice;
             $p['__is_custom'] = true;
             $p['__custom_name'] = $p['name'] ?? 'Custom Product';
-            
+
             $totalAmount += $qty * $unitPrice;
             $totalCost   += $qty * $costPrice;
-            
+
         } elseif ($itemType === 'printout') {
             // Handle printout items
             $printoutModel = Printout::find($p['id']);
@@ -454,7 +454,8 @@ public function submit(Request $request)
 
         // ---- SALE/CREDIT BILL CREATION ----
         $isCreditBill = (bool)($validated['credit_bill'] ?? false);
-        
+        $cashPaid = (float)($validated['cash'] ?? 0);
+
         $billData = [
             'customer_id'    => $customer?->id,
             'employee_id'    => $validated['employee_id'] ?? null,
@@ -463,9 +464,9 @@ public function submit(Request $request)
             'total_amount'   => $totalAmount,
             'discount'       => $totalDiscount,
             'total_cost'     => $totalCost,
-            'payment_method' => $validated['paymentMethod'], // cash|card|cheque
+            'payment_method' => $validated['paymentMethod'], // cash|card|cheque|credit
             'sale_date'      => now()->toDateString(),
-            'cash'           => (float)($validated['cash'] ?? 0),
+            'cash'           => $cashPaid,
             'is_whole'       => $isWhole,
             'custom_discount_type' => $customType,
             'custom_discount'      => $validated['custom_discount'] ?? 0,
@@ -478,9 +479,32 @@ public function submit(Request $request)
 
         // Create either CreditBill or Sale based on checkbox
         if ($isCreditBill) {
+            // For credit bills, allow partial payment
+            $billData['paid_amount'] = $cashPaid;
+
+            // Determine status based on payment
+            if ($cashPaid == 0) {
+                $billData['status'] = 'pending';
+            } elseif ($cashPaid >= $totalAmount) {
+                $billData['status'] = 'completed';
+            } else {
+                $billData['status'] = 'partial';
+            }
+
             /** @var \App\Models\CreditBill $bill */
             $bill = CreditBill::create($billData);
             $billType = 'credit';
+
+            // If there's an initial payment, create a payment record
+            if ($cashPaid > 0) {
+                \App\Models\CreditBillPayment::create([
+                    'credit_bill_id' => $bill->id,
+                    'customer_id' => $customer?->id,
+                    'amount' => $cashPaid,
+                    'payment_method' => 'cash',
+                    'description' => 'Initial payment at order creation',
+                ]);
+            }
         } else {
             /** @var \App\Models\Sale $bill */
             $saleData = $billData;
@@ -494,7 +518,7 @@ public function submit(Request $request)
             $itemType = $p['type'] ?? 'product';
             $qty = (float)$p['quantity'];
             $unitPrice = (float)$p['__resolved_unit_price'];
-            
+
             if ($itemType === 'custom') {
                 // Handle custom product item
                 // First, create the custom product record
@@ -502,7 +526,7 @@ public function submit(Request $request)
                     'name' => $p['__custom_name'],
                     'price' => $unitPrice,
                 ]);
-                
+
                 if ($billType === 'credit') {
                     CreditBillItem::create([
                         'credit_bill_id'    => $bill->id,
@@ -524,13 +548,13 @@ public function submit(Request $request)
                         'total_price'       => $qty * $unitPrice,
                     ]);
                 }
-                
+
                 // No stock to decrement for custom products
-                
+
             } elseif ($itemType === 'printout') {
                 // Handle printout item
                 $printoutModel = $p['__model'];
-                
+
                 if ($billType === 'credit') {
                     CreditBillItem::create([
                         'credit_bill_id' => $bill->id,
@@ -552,7 +576,7 @@ public function submit(Request $request)
                 }
 
                 // Printout stock is unlimited - no decrement needed
-                
+
             } else {
                 // Handle regular product item
                 $productModel = $p['__model'];
@@ -606,14 +630,14 @@ public function submit(Request $request)
                             'return_date' => $item['return_date'] ?? now()->toDateString(),
                             'total_price' => $totalPrice,
                         ]);
-                        
+
 
                         // For return items, we need to increase stock
                         $returnedProduct = Product::find($item['product_id']);
                         if ($returnedProduct) {
                             $returnedProduct->update([
                                 'stock_quantity' => $returnedProduct->stock_quantity + $item['quantity']
-                            ]); 
+                            ]);
 
                             StockTransaction::create([
                                 'product_id' => $item['product_id'],
@@ -994,6 +1018,6 @@ private function upsertCustomerFromArray(array $customerData): ?Customer
         return response()->json(['message' => 'Guide marked as completed.']);
     }
 
-    
+
 
 }

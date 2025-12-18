@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use App\Models\Sale;
-use App\Models\CreditPayment;
+use App\Models\CreditBill;
+use App\Models\CreditBillPayment;
+use App\Models\Cheque;
 use App\Models\Customer;
 
 class CreditController extends Controller
@@ -22,149 +24,193 @@ class CreditController extends Controller
     }
 
     /**
-     * Display all credit payments with part payments included
+     * Display all credit bills with their payments
      */
     public function index()
     {
-        $payments = CreditPayment::with(['customer:id,name', 'sale:id,order_id,total_amount'])
-            ->orderBy('id', 'desc')
+        $creditBills = CreditBill::with([
+                'customer:id,name',
+                'employee:id,name',
+                'payments' => function($query) {
+                    $query->orderBy('created_at', 'desc');
+                }
+            ])
+            ->orderBy('created_at', 'desc')
             ->get()
-            ->groupBy('sale_id')
-            ->map(function ($group) {
-                $first = $group->first();
-                $totalPaid = $group->sum('part_payment');
-                $pending = max(0, $first->sale->total_amount - $totalPaid);
+            ->map(function ($bill) {
+                // Recalculate paid_amount from payments to ensure accuracy
+                $totalPaid = (float) $bill->payments->sum('amount');
 
-                $status = $pending === 0 ? 'Completed' : 'Pending';
+                \Log::info('Processing bill', [
+                    'bill_id' => $bill->id,
+                    'db_paid_amount' => $bill->paid_amount,
+                    'calculated_paid_amount' => $totalPaid,
+                    'payments_count' => $bill->payments->count()
+                ]);
 
-                // Update all credit payments for this sale to reflect correct status
-                $group->each(function ($p) use ($pending) {
-                    $p->status = $p->pending_payment == 0 ? 'Completed' : 'Pending';
-                    $p->save();
-                });
+                // Update the credit bill if there's a discrepancy
+                if ($totalPaid != $bill->paid_amount) {
+                    $bill->paid_amount = $totalPaid;
+
+                    // Update status based on payment
+                    if ($totalPaid >= $bill->total_amount) {
+                        $bill->status = 'completed';
+                    } elseif ($totalPaid > 0) {
+                        $bill->status = 'partial';
+                    } else {
+                        $bill->status = 'pending';
+                    }
+
+                    $bill->save();
+                }
+
+                $pending = max(0, $bill->total_amount - $totalPaid);
 
                 return [
-                    'sale_id' => $first->sale_id,
-                    'order_id' => $first->sale->order_id,
-                    'customer_name' => $first->customer ? $first->customer->name : '-',
-                    'pending_payment' => $pending,
-                    'paid_amount' => $totalPaid,
-                    'total_amount' => $first->sale->total_amount,
-                    'latest_payment_date' => $group->last()->created_at->format('Y-m-d'),
-                    'status' => $status,
-                    'part_payments' => $group->map(function ($p) {
+                    'id' => $bill->id,
+                    'order_id' => $bill->order_id,
+                    'customer_name' => $bill->customer ? $bill->customer->name : '-',
+                    'employee_name' => $bill->employee ? $bill->employee->name : '-',
+                    'total_amount' => (float) $bill->total_amount,
+                    'paid_amount' => (float) $totalPaid,
+                    'pending_amount' => (float) $pending,
+                    'status' => ucfirst($bill->status),
+                    'sale_date' => $bill->sale_date->format('Y-m-d'),
+                    'payment_method' => $bill->payment_method,
+                    'payments' => $bill->payments->map(function ($payment) {
                         return [
-                            'part_payment' => $p->part_payment,
-                            'description' => $p->description,
-                            'date' => $p->created_at->format('Y-m-d'),
-                            'status' => $p->pending_payment == 0 ? 'Completed' : 'Pending',
+                            'id' => $payment->id,
+                            'amount' => (float) $payment->amount,
+                            'payment_method' => $payment->payment_method,
+                            'description' => $payment->description ?? '',
+                            'date' => $payment->created_at->format('Y-m-d H:i'),
                         ];
-                    })->values(),
+                    })->values()->toArray(),
                 ];
-            })->values();
+            })->values()->toArray();
 
-        $customers = Customer::select('id', 'name')->get();
-        $sales = Sale::select('id', 'order_id', 'customer_id', 'total_amount', 'credit_bill')
-            ->where('credit_bill', 1)
-            ->with(['customer:id,name'])
-            ->get();
+        $customers = Customer::select('id', 'name')->orderBy('name')->get()->toArray();
+
+        // Log the data being sent
+        \Log::info('Sending credit bills:', ['data' => $creditBills]);
 
         return Inertia::render('CreditPayment/Index', [
-            'allPayments' => $payments,
+            'creditBills' => $creditBills,
             'customers' => $customers,
-            'sales' => $sales,
         ]);
     }
 
     /**
-     * Store a new credit payment
+     * Store a new partial payment for a credit bill
      */
     public function store(Request $request)
     {
-
+        \Log::info('Payment submission received', ['data' => $request->all()]);
 
         $validated = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
-            'order_id' => 'nullable|string',
-            'sale_id' => 'required|exists:sales,id',
-            'part_payment' => 'required|numeric|min:0',
-            'description' => 'nullable|string|max:255',
+            'credit_bill_id' => 'required|exists:credit_bills,id',
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method' => 'required|string|in:cash,card,cheque',
+            'description' => 'nullable|string|max:500',
+
+            // Cheque fields (required only when payment_method is cheque)
+            'cheque_number' => 'nullable|required_if:payment_method,cheque|string|max:120',
+            'bank_name' => 'nullable|required_if:payment_method,cheque|string|max:120',
+            'cheque_date' => 'nullable|required_if:payment_method,cheque|date',
         ]);
 
-        $sale = Sale::findOrFail($validated['sale_id']);
+        DB::beginTransaction();
+        try {
+            $creditBill = CreditBill::findOrFail($validated['credit_bill_id']);
 
-        // Total paid so far
-        $totalPaid = CreditPayment::where('sale_id', $sale->id)->sum('part_payment');
+            // Calculate remaining amount
+            $remaining = $creditBill->total_amount - $creditBill->paid_amount;
 
-        // Prevent overpayment
-        if ($totalPaid + $validated['part_payment'] > $sale->total_amount) {
-            $overAmount = ($totalPaid + $validated['part_payment']) - $sale->total_amount;
-            return redirect()->back()->with('error', "Payment exceeds total sale amount by {$overAmount}.");
+            // Prevent overpayment
+            if ($validated['amount'] > $remaining) {
+                return redirect()->back()->with('error', "Payment amount ({$validated['amount']}) exceeds remaining balance ({$remaining}).");
+            }
+
+            // Handle cheque if payment method is cheque
+            $chequeId = null;
+            if ($validated['payment_method'] === 'cheque') {
+                $cheque = Cheque::create([
+                    'cheque_number' => $validated['cheque_number'],
+                    'bank_name' => $validated['bank_name'],
+                    'cheque_date' => $validated['cheque_date'],
+                    'amount' => $validated['amount'],
+                    'notes' => $validated['description'] ?? null,
+                    'status' => 'pending',
+                ]);
+                $chequeId = $cheque->id;
+            }
+
+            // Create payment record
+            CreditBillPayment::create([
+                'credit_bill_id' => $creditBill->id,
+                'customer_id' => $creditBill->customer_id,
+                'amount' => $validated['amount'],
+                'payment_method' => $validated['payment_method'],
+                'description' => $validated['description'] ?? null,
+                'cheque_id' => $chequeId,
+            ]);
+
+            // Update credit bill paid amount and status
+            $newPaidAmount = $creditBill->paid_amount + $validated['amount'];
+            $creditBill->paid_amount = $newPaidAmount;
+
+            if ($newPaidAmount >= $creditBill->total_amount) {
+                $creditBill->status = 'completed';
+            } elseif ($newPaidAmount > 0) {
+                $creditBill->status = 'partial';
+            }
+
+            $creditBill->save();
+
+            DB::commit();
+
+            $newPending = max(0, $creditBill->total_amount - $newPaidAmount);
+
+            // Return back to the page with updated data
+            return redirect()->back()
+                ->with('success', "Payment of {$validated['amount']} recorded successfully. Remaining: {$newPending}");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Failed to record payment: ' . $e->getMessage());
         }
-
-        // Calculate pending amount after this payment
-        $pending = max(0, $sale->total_amount - $totalPaid - $validated['part_payment']);
-
-        // Determine status
-        $status = $pending === 0 ? 'Completed' : 'Pending';
-
-        // Create CreditPayment record
-        $creditPayment = CreditPayment::create([
-            'sale_id' => $sale->id,
-            'customer_id' => $validated['customer_id'],
-            'order_id' => $validated['order_id'] ?? null,
-            'part_payment' => $validated['part_payment'],
-            'pending_payment' => $pending,
-            'description' => $validated['description'] ?? null,
-            'status' => $status,
-        ]);
-
-        // Update Sale if fully paid
-        if ($status === 'Completed') {
-            $sale->status = 'completed';
-            $sale->credit_bill = 0;
-            $sale->save();
-        }
-
-        return redirect()->route('credit_payment.index')
-            ->with('success', "Payment of {$validated['part_payment']} recorded successfully. Pending: {$pending}. Status: {$status}.");
     }
 
     /**
-     * Fetch single sale with part payments (for modal or API)
+     * Get details of a specific credit bill with all its payments
      */
-    public function show($sale_id)
+    public function show($id)
     {
-        $sale = Sale::with([
-            'customer:id,name',
-            'creditPayments' => fn($q) => $q->orderBy('created_at', 'asc')
-        ])->findOrFail($sale_id);
-
-        $totalPaid = $sale->creditPayments->sum('part_payment');
-        $pending = max(0, $sale->total_amount - $totalPaid);
-        $status = $pending === 0 ? 'Completed' : 'Pending';
-
-        // Update each payment status if needed
-        $sale->creditPayments->each(function ($p) {
-            $p->status = $p->pending_payment == 0 ? 'Completed' : 'Pending';
-            $p->save();
-        });
+        $creditBill = CreditBill::with(['customer', 'employee', 'payments.cheque', 'items.product'])
+            ->findOrFail($id);
 
         return response()->json([
-            'sale_id' => $sale->id,
-            'order_id' => $sale->order_id,
-            'customer_name' => $sale->customer ? $sale->customer->name : '-',
-            'total_amount' => $sale->total_amount,
-            'paid_amount' => $totalPaid,
-            'pending_payment' => $pending,
-            'latest_payment_date' => optional($sale->creditPayments->last())->created_at->format('Y-m-d'),
-            'status' => $status,
-            'part_payments' => $sale->creditPayments->map(fn($p) => [
-                'part_payment' => $p->part_payment,
-                'description' => $p->description,
-                'date' => $p->created_at->format('Y-m-d'),
-                'status' => $p->pending_payment == 0 ? 'Completed' : 'Pending',
-            ]),
+            'id' => $creditBill->id,
+            'order_id' => $creditBill->order_id,
+            'customer' => $creditBill->customer,
+            'employee' => $creditBill->employee,
+            'total_amount' => $creditBill->total_amount,
+            'paid_amount' => $creditBill->paid_amount,
+            'pending_amount' => $creditBill->pending_amount,
+            'status' => $creditBill->status,
+            'sale_date' => $creditBill->sale_date->format('Y-m-d'),
+            'payment_method' => $creditBill->payment_method,
+            'items' => $creditBill->items,
+            'payments' => $creditBill->payments->map(function ($payment) {
+                return [
+                    'id' => $payment->id,
+                    'amount' => $payment->amount,
+                    'payment_method' => $payment->payment_method,
+                    'description' => $payment->description,
+                    'date' => $payment->created_at->format('Y-m-d H:i'),
+                    'cheque' => $payment->cheque,
+                ];
+            }),
         ]);
     }
 }

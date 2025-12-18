@@ -34,7 +34,7 @@
             class="px-6 py-3 text-xl font-normal tracking-wider text-white text-center bg-blue-600 rounded-lg custom-select hidden sm:inline-block">
             Reset
           </Link>
-          <button 
+          <button
             @click="openInCashModal"
             class="px-6 py-3 text-xl font-normal tracking-wider text-white text-center bg-green-600 rounded-lg custom-select hidden sm:inline-block hover:bg-green-700">
             AddInCash
@@ -51,7 +51,7 @@
             class="px-6 py-3 text-xl font-normal tracking-wider text-white text-center bg-blue-600 rounded-lg custom-select">
             Reset
           </Link>
-            <button 
+            <button
             @click="openInCashModal"
             class="px-6 py-3 text-xl font-normal tracking-wider text-white text-center bg-green-600 rounded-lg custom-select hidden sm:inline-block hover:bg-green-700">
             + Add In Cash
@@ -90,7 +90,7 @@
         <p class="text-2xl font-bold text-black">{{ totalCustomer }}</p>
       </div>
 
-     
+
     </div>
 
     <div class="grid w-full md:grid-cols-5 grid-cols-3 gap-4 mb-4">
@@ -230,7 +230,8 @@
           </thead>
 
           <tbody class="text-[12px] font-medium">
-            <tr v-for="(s, i) in sales" :key="s.id ?? i" class="border-b transition duration-200 hover:bg-gray-100">
+            <!-- Regular Sales -->
+            <tr v-for="(s, i) in sales" :key="'sale-' + (s.id ?? i)" class="border-b transition duration-200 hover:bg-gray-100">
               <td class="p-3 text-center">{{ i + 1 }}</td>
               <td class="p-3 whitespace-nowrap text-center">{{ formatDate(s.sale_date) }}</td>
               <td class="p-3 text-center">
@@ -265,6 +266,33 @@
                     </span>
                   </li>
                 </ul>
+              </td>
+            </tr>
+
+            <!-- Credit Bills -->
+            <tr v-for="(cb, i) in creditBills" :key="'credit-' + (cb.id ?? i)" class="border-b transition duration-200 hover:bg-blue-50">
+              <td class="p-3 text-center">{{ sales.length + i + 1 }}</td>
+              <td class="p-3 whitespace-nowrap text-center">{{ formatDate(cb.sale_date) }}</td>
+              <td class="p-3 text-center">{{ cb.order_id }} <span class="text-blue-600 font-semibold">(Credit)</span></td>
+              <td class="p-3">{{ cb.customer?.name ?? 'N/A' }}</td>
+              <td class="p-3 text-center">-</td>
+              <td class="p-3 num text-center">
+                {{ toMoney(cb.filtered_paid_amount || 0) }}
+              </td>
+              <td class="p-3 num text-center">
+                {{ toMoney((cb.discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) }}
+              </td>
+              <td class="p-3 num text-center">
+                {{ toMoney((cb.total_cost || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) }}
+              </td>
+              <td class="p-3 num text-center">
+                <span class="font-semibold text-green-600">
+                  {{ toMoney(
+                    (cb.filtered_paid_amount || 0) -
+                    ((cb.total_cost || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) -
+                    ((cb.discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1)))
+                  ) }}
+                </span>
               </td>
             </tr>
           </tbody>
@@ -557,7 +585,7 @@
                 <th class="p-3 text-center font-semibold">Transaction Date</th>
                 <th class="p-3 text-center font-semibold">Quantity</th>
                 <th class="p-3 text-center font-semibold">Selling Price</th>
-                <th class="p-3 text-center font-semibold">Total Selling Price</th> 
+                <th class="p-3 text-center font-semibold">Total Selling Price</th>
               </tr>
             </thead>
 
@@ -585,18 +613,18 @@
   </div>
 
   <!-- IN CASH MODAL -->
-  <div v-if="showInCashModal" 
+  <div v-if="showInCashModal"
        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
        @click.self="closeInCashModal">
     <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
       <h3 class="text-2xl font-bold text-gray-800 mb-6">Add In Cash</h3>
-      
+
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             Amount (LKR) <span class="text-red-500">*</span>
           </label>
-          <input 
+          <input
             v-model="inCashForm.amount"
             type="number"
             step="0.01"
@@ -611,7 +639,7 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             Note (Optional)
           </label>
-          <textarea 
+          <textarea
             v-model="inCashForm.note"
             rows="3"
             placeholder="Add a note..."
@@ -622,13 +650,13 @@
       </div>
 
       <div class="flex justify-end gap-3 mt-6">
-        <button 
+        <button
           @click="closeInCashModal"
           :disabled="isSubmittingInCash"
           class="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 font-semibold disabled:opacity-50">
           Cancel
         </button>
-        <button 
+        <button
           @click="submitInCash"
           :disabled="isSubmittingInCash"
           class="px-6 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50">
@@ -668,7 +696,10 @@ ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale,
 const props = defineProps({
   products: { type: Array, required: true },
   sales: { type: Array, required: true },
+  creditBills: { type: Array, default: () => [] },
   totalSaleAmount: { type: Number, required: true },
+  totalCreditBillPaidAmount: { type: Number, default: 0 },
+  totalRevenue: { type: Number, required: true },
   averageTransactionValue: { type: Number, required: true },
   netProfit: { type: Number, required: true },
   totalTransactions: { type: Number, required: true },
@@ -686,6 +717,7 @@ const props = defineProps({
   inCashRecords: { type: Array, default: () => [] },
   totalInCashAmount: { type: Number, default: 0 },
   totalInCashCount: { type: Number, default: 0 },
+  paymentMethodTotals: { type: Object, default: () => ({}) },
 });
 
 // State
@@ -694,6 +726,7 @@ const endDate = ref(props.endDate);
 const products = ref(props.products);
 const stockTransactionsReturn = ref(props.stockTransactionsReturn);
 const sales = ref(props.sales);
+const creditBills = ref(props.creditBills || []);
 const expenses = ref(props.expenses);
 const totalExpenseAmount = ref(props.totalExpenseAmount || 0);
 const totalExpenseCount = ref(props.totalExpenseCount || 0);
@@ -790,7 +823,7 @@ const filteredProducts = computed(() => {
     return products.value;
   }
   const query = productSearchQuery.value.toLowerCase();
-  return products.value.filter(p => 
+  return products.value.filter(p =>
     (p.name || '').toLowerCase().includes(query) ||
     (p.barcode || '').toLowerCase().includes(query)
   );
@@ -910,10 +943,11 @@ const saleProfit = (s) => {
   return net - cost;
 };
 
-// Totals
+// Totals (include credit bills)
 const salesTotalQty = computed(() => sales.value.reduce((a, s) => a + saleQty(s), 0));
-const salesGrossTotal = computed(() =>
-  sales.value.reduce((a, s) => {
+
+const salesGrossTotal = computed(() => {
+  const regularSales = sales.value.reduce((a, s) => {
     const total = Number(s.total_amount || 0);
     let customDiscountLkr = 0;
     if (s.custom_discount_type === "percent") {
@@ -922,18 +956,42 @@ const salesGrossTotal = computed(() =>
       customDiscountLkr = Number(s.custom_discount || 0);
     }
     return a + (total - customDiscountLkr);
-  }, 0)
-);
+  }, 0);
 
-const salesDiscountTotal = computed(() =>
-  sales.value.reduce((a, s) => a + discountLkr(s), 0)
-);
+  const creditBillPayments = creditBills.value.reduce((a, cb) => a + Number(cb.filtered_paid_amount || 0), 0);
 
-const salesCostTotal = computed(() => sales.value.reduce((a, s) => a + Number(s.total_cost || 0), 0));
+  return regularSales + creditBillPayments;
+});
 
-const salesProfitTotal = computed(() =>
-  sales.value.reduce((sum, s) => sum + saleProfit(s), 0)
-);
+const salesDiscountTotal = computed(() => {
+  const regularDiscounts = sales.value.reduce((a, s) => a + discountLkr(s), 0);
+  const creditDiscounts = creditBills.value.reduce((a, cb) => {
+    const ratio = Number(cb.filtered_paid_amount || 0) / Number(cb.total_amount || 1);
+    return a + (Number(cb.discount || 0) * ratio);
+  }, 0);
+  return regularDiscounts + creditDiscounts;
+});
+
+const salesCostTotal = computed(() => {
+  const regularCost = sales.value.reduce((a, s) => a + Number(s.total_cost || 0), 0);
+  const creditCost = creditBills.value.reduce((a, cb) => {
+    const ratio = Number(cb.filtered_paid_amount || 0) / Number(cb.total_amount || 1);
+    return a + (Number(cb.total_cost || 0) * ratio);
+  }, 0);
+  return regularCost + creditCost;
+});
+
+const salesProfitTotal = computed(() => {
+  const regularProfit = sales.value.reduce((sum, s) => sum + saleProfit(s), 0);
+  const creditProfit = creditBills.value.reduce((a, cb) => {
+    const paid = Number(cb.filtered_paid_amount || 0);
+    const ratio = paid / Number(cb.total_amount || 1);
+    const cost = Number(cb.total_cost || 0) * ratio;
+    const discount = Number(cb.discount || 0) * ratio;
+    return a + (paid - cost - discount);
+  }, 0);
+  return regularProfit + creditProfit;
+});
 
 // Date label for PDFs
 const dateRangeLabel = computed(() => {
@@ -1340,16 +1398,16 @@ onMounted(() => {
 #salesTbl_filter, #stockQtyTbl_filter, #expenseTbl_filter, #inCashTbl_filter {
   display: flex; justify-content: flex-end; align-items: center; margin-bottom: 16px; float: left;
 }
-#salesTbl_filter label, #stockQtyTbl_filter label, #expenseTbl_filter label, #inCashTbl_filter label { 
-  font-size: 17px; color: #000000; display: flex; align-items: center; 
+#salesTbl_filter label, #stockQtyTbl_filter label, #expenseTbl_filter label, #inCashTbl_filter label {
+  font-size: 17px; color: #000000; display: flex; align-items: center;
 }
-#salesTbl_filter input[type="search"], #stockQtyTbl_filter input[type="search"], 
+#salesTbl_filter input[type="search"], #stockQtyTbl_filter input[type="search"],
 #expenseTbl_filter input[type="search"], #inCashTbl_filter input[type="search"] {
   font-weight: 400; padding: 9px 15px; font-size: 14px; color: #000000cc;
   border: 1px solid rgb(209 213 219); border-radius: 5px; background: #fff;
   outline: none; transition: all 0.5s ease;
 }
-#salesTbl_filter input[type="search"]:focus, #stockQtyTbl_filter input[type="search"]:focus, 
+#salesTbl_filter input[type="search"]:focus, #stockQtyTbl_filter input[type="search"]:focus,
 #expenseTbl_filter input[type="search"]:focus, #inCashTbl_filter input[type="search"]:focus {
   border: 1px solid #4b5563; box-shadow: none;
 }

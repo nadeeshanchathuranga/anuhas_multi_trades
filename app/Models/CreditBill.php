@@ -20,6 +20,8 @@ class CreditBill extends Model
         'payment_method',
         'sale_date',
         'cash',
+        'paid_amount',
+        'status',
         'is_whole',
         'custom_discount_type',
         'custom_discount',
@@ -32,6 +34,7 @@ class CreditBill extends Model
         'discount' => 'decimal:2',
         'total_cost' => 'decimal:2',
         'cash' => 'decimal:2',
+        'paid_amount' => 'decimal:2',
         'custom_discount' => 'decimal:2',
         'is_whole' => 'boolean',
     ];
@@ -59,5 +62,15 @@ class CreditBill extends Model
     public function cheque()
     {
         return $this->belongsTo(Cheque::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(CreditBillPayment::class);
+    }
+
+    public function getPendingAmountAttribute()
+    {
+        return max(0, $this->total_amount - $this->paid_amount);
     }
 }

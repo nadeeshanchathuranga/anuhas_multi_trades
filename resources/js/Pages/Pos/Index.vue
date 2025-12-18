@@ -198,7 +198,7 @@
                         </span>
                       </p>
 
-                     
+
 
                       <div class="flex items-center justify-between w-full">
                         <div class="flex items-center gap-2">
@@ -1234,7 +1234,8 @@ const submitOrder = async () => {
     credit_bill.value = true;
   }
 
-  if (parseFloat(balance.value) < 0) {
+  // Only check for sufficient cash if NOT a credit bill (credit bills allow partial payment)
+  if (parseFloat(balance.value) < 0 && !credit_bill.value) {
     isAlertModalOpen.value = true;
     message.value = "Cash is not enough";
     isSubmitting.value = false;
@@ -1405,19 +1406,19 @@ const totalDiscount = computed(() => {
   const productDiscount = products.value.reduce((t, item) => {
     // Check if discount should be applied
     const discountPercent = isWholesale.value ? (item.wholesale_discount || 0) : (item.discount || 0);
-    
+
     if (discountPercent && discountPercent > 0 && item.apply_discount === true) {
       // Get the base price
-      const basePrice = isWholesale.value 
-        ? parseFloat(item.whole_price || item.selling_price || item.price) 
+      const basePrice = isWholesale.value
+        ? parseFloat(item.whole_price || item.selling_price || item.price)
         : parseFloat(item.selling_price || item.price);
-      
+
       // Calculate discount amount per unit
       const discountPerUnit = (basePrice * discountPercent) / 100;
-      
+
       // Total discount for all quantities
       const totalItemDiscount = discountPerUnit * (Number(item.quantity) || 0);
-      
+
       return t + Math.max(totalItemDiscount, 0);
     }
     return t;
