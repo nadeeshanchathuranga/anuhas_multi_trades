@@ -18,7 +18,11 @@ class SaleItem extends Model
         'unit_price',
         'total_price',
         'reason_id',
-
+        'discount',
+        'apply_discount',
+        'discounted_price',
+        'include_custom',
+        'selling_price',
     ];
 
 

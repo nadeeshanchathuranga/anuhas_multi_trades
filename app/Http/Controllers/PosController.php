@@ -399,9 +399,18 @@ public function submit(Request $request)
         if (!empty($p['apply_discount']) && isset($p['discount'], $p['discounted_price'])) {
             $discount = (float)($p['discount'] ?? 0);
             if ($discount > 0) {
-                $originalPrice   = (float)($p['unit_price'] ?? $p['__resolved_unit_price']);
+                $originalPrice   = (float)($p['selling_price'] ?? $p['unit_price'] ?? $p['__resolved_unit_price']);
                 $discountedPrice = (float)$p['discounted_price'];
                 $productDiscounts += ($originalPrice - $discountedPrice) * (float)$p['quantity'];
+            }
+        } elseif (!empty($p['apply_discount']) && isset($p['discount'])) {
+            // Handle percentage discount without explicit discounted_price
+            $discount = (float)($p['discount'] ?? 0);
+            if ($discount > 0) {
+                $originalPrice   = (float)($p['selling_price'] ?? $p['unit_price'] ?? $p['__resolved_unit_price']);
+                $qty = (float)$p['quantity'];
+                $discountAmount = ($originalPrice * $discount / 100) * $qty;
+                $productDiscounts += $discountAmount;
             }
         }
     }
@@ -410,18 +419,27 @@ public function submit(Request $request)
             return $carry + ($item['quantity'] * $item['unit_price']);
         }, 0);
 
-    // Coupon & custom
+    // Coupon & custom discount calculation
     $couponDiscount = (float) data_get($validated, 'appliedCoupon.discount', 0);
     $customDiscount = (float) ($validated['custom_discount'] ?? 0);
     $customType     = $validated['custom_discount_type'] ?? 'fixed';
 
     if ($customType === 'percent') {
-        // percent is based on subtotal BEFORE discounts
-        $customDiscount = round(($totalAmount * $customDiscount) / 100, 2);
+        // Calculate custom discount only on items marked with include_custom
+        $customSubtotal = 0.0;
+        foreach ($products as $p) {
+            if (!empty($p['include_custom'])) {
+                $qty = (float)$p['quantity'];
+                $unitPrice = (float)$p['__resolved_unit_price'];
+                $customSubtotal += $qty * $unitPrice;
+            }
+        }
+        // Apply percentage discount only to custom subtotal
+        $customDiscount = round(($customSubtotal * $customDiscount) / 100, 2);
     }
 
-    // Final discount (cap at subtotal)
-    $totalDiscount = max(0, min($totalAmount, $productDiscounts + $couponDiscount + $customDiscount));
+    // Separate product discounts from custom discount to avoid double counting
+    $totalProductDiscount = max(0, min($totalAmount, $productDiscounts + $couponDiscount));
 
     DB::beginTransaction();
     try {
@@ -462,14 +480,14 @@ public function submit(Request $request)
             'user_id'        => $validated['userId'],
             'order_id'       => $validated['orderid'],
             'total_amount'   => $totalAmount,
-            'discount'       => $totalDiscount,
+            'discount'       => $totalProductDiscount, // Only product + coupon discounts (not custom)
             'total_cost'     => $totalCost,
             'payment_method' => $validated['paymentMethod'], // cash|card|cheque|credit
             'sale_date'      => now()->toDateString(),
             'cash'           => $cashPaid,
             'is_whole'       => $isWhole,
             'custom_discount_type' => $customType,
-            'custom_discount'      => $validated['custom_discount'] ?? 0,
+            'custom_discount'      => $customDiscount, // Store calculated discount amount (25.00), not percentage (10%)
         ];
 
         // Optionally attach cheque_id
@@ -519,6 +537,25 @@ public function submit(Request $request)
             $qty = (float)$p['quantity'];
             $unitPrice = (float)$p['__resolved_unit_price'];
 
+            // Extract discount information from product data
+            $discount = (float)($p['discount'] ?? 0);
+            $applyDiscount = (bool)($p['apply_discount'] ?? false);
+            $discountedPrice = isset($p['discounted_price']) ? (float)$p['discounted_price'] : null;
+            $includeCustom = (bool)($p['include_custom'] ?? false);
+            $sellingPrice = (float)($p['selling_price'] ?? $p['unit_price'] ?? $unitPrice);
+            
+            // Calculate the correct total price after discount
+            $lineTotal = $unitPrice * $qty;
+            if ($applyDiscount) {
+                if ($discountedPrice !== null && $discountedPrice > 0) {
+                    // Use explicit discounted price
+                    $lineTotal = $discountedPrice * $qty;
+                } elseif ($discount > 0) {
+                    // Apply percentage discount
+                    $lineTotal = ($sellingPrice * (1 - $discount / 100)) * $qty;
+                }
+            }
+
             if ($itemType === 'custom') {
                 // Handle custom product item
                 // First, create the custom product record
@@ -545,7 +582,12 @@ public function submit(Request $request)
                         'custom_product_id' => $customProduct->id,
                         'quantity'          => $qty,
                         'unit_price'        => $unitPrice,
-                        'total_price'       => $qty * $unitPrice,
+                        'total_price'       => $lineTotal, // Use discounted total
+                        'discount'          => $discount,
+                        'apply_discount'    => $applyDiscount,
+                        'discounted_price'  => $discountedPrice,
+                        'include_custom'    => $includeCustom,
+                        'selling_price'     => $sellingPrice,
                     ]);
                 }
 
@@ -566,12 +608,17 @@ public function submit(Request $request)
                     ]);
                 } else {
                     SaleItem::create([
-                        'sale_id'        => $bill->id,
-                        'product_id'     => null,
-                        'printout_id'    => $printoutModel->id,
-                        'quantity'       => $qty,
-                        'unit_price'     => $unitPrice,
-                        'total_price'    => $qty * $unitPrice,
+                        'sale_id'           => $bill->id,
+                        'product_id'        => null,
+                        'printout_id'       => $printoutModel->id,
+                        'quantity'          => $qty,
+                        'unit_price'        => $unitPrice,
+                        'total_price'       => $lineTotal, // Use discounted total
+                        'discount'          => $discount,
+                        'apply_discount'    => $applyDiscount,
+                        'discounted_price'  => $discountedPrice,
+                        'include_custom'    => $includeCustom,
+                        'selling_price'     => $sellingPrice,
                     ]);
                 }
 
@@ -591,11 +638,16 @@ public function submit(Request $request)
                     ]);
                 } else {
                     SaleItem::create([
-                        'sale_id'     => $bill->id,
-                        'product_id'  => $productModel->id,
-                        'quantity'    => $qty,
-                        'unit_price'  => $unitPrice,
-                        'total_price' => $qty * $unitPrice,
+                        'sale_id'           => $bill->id,
+                        'product_id'        => $productModel->id,
+                        'quantity'          => $qty,
+                        'unit_price'        => $unitPrice,
+                        'total_price'       => $lineTotal, // Use discounted total
+                        'discount'          => $discount,
+                        'apply_discount'    => $applyDiscount,
+                        'discounted_price'  => $discountedPrice,
+                        'include_custom'    => $includeCustom,
+                        'selling_price'     => $sellingPrice,
                     ]);
                 }
 
