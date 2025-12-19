@@ -243,11 +243,8 @@
                 {{
                   toMoney(
                     s.total_amount -
-                    (
-                      s.custom_discount_type === 'percent'
-                        ? (Number(s.total_amount || 0) * Number(s.custom_discount || 0) / 100)
-                        : Number(s.custom_discount || 0)
-                    )
+                    Number(s.discount || 0) -
+                    Number(s.custom_discount || 0)
                   )
                 }}
               </td>
@@ -280,18 +277,26 @@
                 {{ toMoney(cb.filtered_paid_amount || 0) }}
               </td>
               <td class="p-3 num text-center">
-                {{ toMoney((cb.discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) }}
+                {{
+                  toMoney(
+                    (Number(cb.discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) +
+                    (Number(cb.custom_discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1)))
+                  )
+                }}
               </td>
               <td class="p-3 num text-center">
                 {{ toMoney((cb.total_cost || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) }}
               </td>
               <td class="p-3 num text-center">
                 <span class="font-semibold text-green-600">
-                  {{ toMoney(
-                    (cb.filtered_paid_amount || 0) -
-                    ((cb.total_cost || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) -
-                    ((cb.discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1)))
-                  ) }}
+                  {{
+                    toMoney(
+                      (cb.filtered_paid_amount || 0) -
+                      ((cb.total_cost || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) -
+                      (Number(cb.discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1))) -
+                      (Number(cb.custom_discount || 0) * ((cb.filtered_paid_amount || 0) / (cb.total_amount || 1)))
+                    )
+                  }}
                 </span>
               </td>
             </tr>
@@ -905,40 +910,48 @@ const chartOptions4 = { responsive: true, plugins: { legend: { display: true, po
 const saleQty = (s) => (Array.isArray(s.sale_items) ? s.sale_items.reduce((n, it) => n + Number(it.quantity || 0), 0) : 0);
 
 const customDiscountLkr = (s) => {
-  const gross = Number(s.total_amount || 0);
-  const val = Number(s.custom_discount || 0);
-  const type = s.custom_discount_type || 'fixed';
-  return type === 'percent' ? (gross * val / 100) : val;
+  // The custom_discount field always contains the calculated LKR amount,
+  // regardless of custom_discount_type, since POS calculates and stores the final amount
+  return Number(s.custom_discount || 0);
 };
 
-const discountLkr = (s) => customDiscountLkr(s);
+const discountLkr = (s) => {
+  const productDiscount = Number(s.discount || 0);
+  const customDiscount = customDiscountLkr(s);
+  return productDiscount + customDiscount;
+};
 
 const discountDisplay = (s) => {
   const parts = [];
-  const gross = Number(s.total_amount || 0);
-  const customVal = Number(s.custom_discount || 0);
+  const productDiscount = Number(s.discount || 0);
+  const customDiscountAmount = Number(s.custom_discount || 0);
   const customType = s.custom_discount_type || "fixed";
 
-  if (customVal > 0) {
+  // Add product discount if exists
+  if (productDiscount > 0) {
+    parts.push(`Product: ${toMoney(productDiscount)} LKR`);
+  }
+
+  // Add custom discount if exists
+  if (customDiscountAmount > 0) {
     if (customType === "percent") {
-      const lkr = (gross * customVal) / 100;
-      parts.push(`${customVal}% (${toMoney(lkr)} LKR)`);
+      // Show that it was percentage-based but display the calculated amount
+      parts.push(`Custom: ${toMoney(customDiscountAmount)} LKR`);
     } else {
-      parts.push(`${toMoney(customVal)} LKR`);
+      parts.push(`Custom: ${toMoney(customDiscountAmount)} LKR`);
     }
   }
 
-  return parts.join("  |  ");
+  return parts.length > 0 ? parts.join("  |  ") : "0 LKR";
 };
 
 const saleProfit = (s) => {
   const gross = Number(s.total_amount || 0);
-  const discount =
-    (s.custom_discount_type || "fixed") === "percent"
-      ? (gross * Number(s.custom_discount || 0)) / 100
-      : Number(s.custom_discount || 0);
+  const productDiscount = Number(s.discount || 0);
+  const customDiscount = Number(s.custom_discount || 0);
 
-  const net = gross - discount;
+  const totalDiscount = productDiscount + customDiscount;
+  const net = gross - totalDiscount;
   const cost = Number(s.total_cost || 0);
   return net - cost;
 };
@@ -949,13 +962,10 @@ const salesTotalQty = computed(() => sales.value.reduce((a, s) => a + saleQty(s)
 const salesGrossTotal = computed(() => {
   const regularSales = sales.value.reduce((a, s) => {
     const total = Number(s.total_amount || 0);
-    let customDiscountLkr = 0;
-    if (s.custom_discount_type === "percent") {
-      customDiscountLkr = (total * Number(s.custom_discount || 0)) / 100;
-    } else {
-      customDiscountLkr = Number(s.custom_discount || 0);
-    }
-    return a + (total - customDiscountLkr);
+    const productDiscount = Number(s.discount || 0);
+    const customDiscountLkr = Number(s.custom_discount || 0);
+    const totalDiscount = productDiscount + customDiscountLkr;
+    return a + (total - totalDiscount);
   }, 0);
 
   const creditBillPayments = creditBills.value.reduce((a, cb) => a + Number(cb.filtered_paid_amount || 0), 0);
@@ -967,7 +977,10 @@ const salesDiscountTotal = computed(() => {
   const regularDiscounts = sales.value.reduce((a, s) => a + discountLkr(s), 0);
   const creditDiscounts = creditBills.value.reduce((a, cb) => {
     const ratio = Number(cb.filtered_paid_amount || 0) / Number(cb.total_amount || 1);
-    return a + (Number(cb.discount || 0) * ratio);
+    const productDiscount = Number(cb.discount || 0) * ratio;
+    const customDiscount = Number(cb.custom_discount || 0) * ratio;
+    
+    return a + productDiscount + customDiscount;
   }, 0);
   return regularDiscounts + creditDiscounts;
 });
@@ -987,8 +1000,10 @@ const salesProfitTotal = computed(() => {
     const paid = Number(cb.filtered_paid_amount || 0);
     const ratio = paid / Number(cb.total_amount || 1);
     const cost = Number(cb.total_cost || 0) * ratio;
-    const discount = Number(cb.discount || 0) * ratio;
-    return a + (paid - cost - discount);
+    const productDiscount = Number(cb.discount || 0) * ratio;
+    const customDiscount = Number(cb.custom_discount || 0) * ratio;
+    
+    return a + (paid - cost - productDiscount - customDiscount);
   }, 0);
   return regularProfit + creditProfit;
 });
@@ -1035,7 +1050,7 @@ const downloadSalesTablePDF = () => {
     const orderNumber = s.order_id ? s.order_id : `Service - ${s.service_name || ""}`;
     const customer = s.customer?.name ?? "N/A";
     const qty = saleQty(s);
-    const grossNet = Number(s.total_amount || 0) - customDiscountLkr(s);
+    const grossNet = Number(s.total_amount || 0) - discountLkr(s);
     const discounts = discountDisplay(s);
     const cost = Number(s.total_cost || 0);
     const profit = saleProfit(s);
@@ -1054,8 +1069,8 @@ const downloadSalesTablePDF = () => {
   });
 
   const totalQty = sales.value.reduce((a, s) => a + saleQty(s), 0);
-  const totalGrossNet = sales.value.reduce((a, s) => a + (Number(s.total_amount || 0) - customDiscountLkr(s)), 0);
-  const totalDiscounts = sales.value.reduce((a, s) => a + customDiscountLkr(s), 0);
+  const totalGrossNet = sales.value.reduce((a, s) => a + (Number(s.total_amount || 0) - discountLkr(s)), 0);
+  const totalDiscounts = sales.value.reduce((a, s) => a + discountLkr(s), 0);
   const totalCost = sales.value.reduce((a, s) => a + Number(s.total_cost || 0), 0);
   const totalProfit = sales.value.reduce((a, s) => a + saleProfit(s), 0);
 

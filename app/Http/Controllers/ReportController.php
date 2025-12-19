@@ -119,10 +119,15 @@ class ReportController extends Controller
 
         // Helpers
         $customDiscountToLkr = function ($sale) {
-            $gross = (float) ($sale->total_amount ?? 0);
-            $val   = (float) ($sale->custom_discount ?? 0);
-            $type  = $sale->custom_discount_type ?? 'fixed';
-            return $type === 'percent' ? ($gross * $val / 100.0) : $val;
+            // The custom_discount field always contains the calculated LKR amount,
+            // regardless of custom_discount_type, since POS calculates and stores the final amount
+            return (float) ($sale->custom_discount ?? 0);
+        };
+
+        $totalDiscountToLkr = function ($sale) use ($customDiscountToLkr) {
+            $productDiscount = (float) ($sale->discount ?? 0);
+            $customDiscount = $customDiscountToLkr($sale);
+            return $productDiscount + $customDiscount;
         };
 
         // Category totals (from filtered sales)
@@ -158,35 +163,40 @@ class ReportController extends Controller
                 'Total Sales Amount' => 0,
             ];
             $gross       = (float) ($sale->total_amount ?? 0);
-            $prodDisc    = (float) ($sale->discount ?? 0);
-            $customDisc  = $customDiscountToLkr($sale);
-            $employeeSalesSummary[$name]['Total Sales Amount'] += ($gross - $prodDisc - $customDisc);
+            $totalDisc   = $totalDiscountToLkr($sale);
+            $employeeSalesSummary[$name]['Total Sales Amount'] += ($gross - $totalDisc);
         }
 
         // Overall stats from regular sales
         $totalSaleAmount         = (float) $sales->sum('total_amount');
         $totalCost               = (float) $sales->sum('total_cost');
         $totalProductDiscountLkr = (float) $sales->sum('discount');
-        $totalCustomDiscountLkr  = (float) $sales->reduce(fn($c, $s) => $c + $customDiscountToLkr($s), 0.0);
+        $totalCustomDiscountLkr  = (float) $sales->reduce(function($c, $s) use ($customDiscountToLkr) { return $c + $customDiscountToLkr($s); }, 0.0);
+        $totalAllDiscountLkr     = (float) $sales->reduce(function($c, $s) use ($totalDiscountToLkr) { return $c + $totalDiscountToLkr($s); }, 0.0);
 
         // Credit bills - only count payments made in the filtered date range
         $totalCreditBillPaidAmount = (float) $creditBills->sum('filtered_paid_amount');
 
         // Calculate the proportion of payment to apply costs and discounts
+        $totalCreditDiscountLkr = 0;
         foreach ($creditBills as $cb) {
             if ($cb->total_amount > 0) {
                 // Use filtered paid amount (payments in date range)
                 $paymentRatio = $cb->filtered_paid_amount / $cb->total_amount;
                 // Only include proportional cost and discount based on what's been paid in this period
                 $totalCost += ($cb->total_cost * $paymentRatio);
-                $totalProductDiscountLkr += ($cb->discount * $paymentRatio);
-                $totalCustomDiscountLkr += ($customDiscountToLkr($cb) * $paymentRatio);
+                $cbProductDiscount = ($cb->discount * $paymentRatio);
+                $cbCustomDiscount = ($customDiscountToLkr($cb) * $paymentRatio);
+                $totalProductDiscountLkr += $cbProductDiscount;
+                $totalCustomDiscountLkr += $cbCustomDiscount;
+                $totalCreditDiscountLkr += ($cbProductDiscount + $cbCustomDiscount);
             }
         }
+        $totalAllDiscountLkr += $totalCreditDiscountLkr;
 
         // Net profit = (regular sales + credit bill payments) - costs - discounts
         $totalRevenue = $totalSaleAmount + $totalCreditBillPaidAmount;
-        $netProfit = $totalRevenue - $totalCost - ($totalProductDiscountLkr + $totalCustomDiscountLkr);
+        $netProfit = $totalRevenue - $totalCost - $totalAllDiscountLkr;
 
         $totalTransactions       = $sales->count() + $creditBills->count();
         $averageTransactionValue = $totalTransactions > 0 ? ($totalRevenue / $totalTransactions) : 0;
@@ -232,7 +242,8 @@ class ReportController extends Controller
             'totalSaleAmount'           => round($totalSaleAmount, 2),
             'totalCreditBillPaidAmount' => round($totalCreditBillPaidAmount, 2),
             'totalRevenue'              => round($totalRevenue, 2),
-            'totalDiscountLkr'          => round($totalProductDiscountLkr, 2),
+            'totalDiscountLkr'          => round($totalAllDiscountLkr, 2),
+            'totalProductDiscountLkr'   => round($totalProductDiscountLkr, 2),
             'totalCustomDiscountLkr'    => round($totalCustomDiscountLkr, 2),
             'netProfit'                 => round($netProfit, 2),
             'totalTransactions'         => $totalTransactions,
