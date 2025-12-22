@@ -70,7 +70,7 @@
               <!-- Totals -->
               <td class="p-4 font-semibold border-gray-200 text-sm leading-5">
                 Base Total: {{ money(history.total_amount) }} LKR<br>
-                
+
                 Final:
                 <span class="inline-block px-2 py-1 text-xs font-bold text-white bg-green-600 rounded">
                   {{ money(finalTotalForHistory(history)) }} LKR
@@ -386,7 +386,7 @@ const printReceipt = (history) => {
   const subTotalFromSales = num(history.total_amount || 0);
   const regularDiscount = num(history.discount || 0);
   const customDiscountAmount = num(history.custom_discount || 0);
-  
+
   // Calculate custom eligible subtotal (items with include_custom = 1)
   const customEligibleSubtotal = items.reduce((sum, item) => {
     if (item.include_custom) {
@@ -429,7 +429,7 @@ const printReceipt = (history) => {
         const name = item?.product?.name || item?.custom_product?.name || item?.printout?.name || item?.name || "N/A";
         const qty = num(item.quantity || 0);
         const { unitPrice, finalLineTotal } = computeEffectivePrice(item);
-        
+
         return `
           <tr>
             <td>
@@ -471,6 +471,18 @@ const printReceipt = (history) => {
 <style>
   @media print { body { margin:0; padding:0; -webkit-print-color-adjust: none; background: white !important; } }
   body { background: white; font-size: 11px; font-family: Arial, sans-serif; margin:0; padding:10px; color:#000; }
+
+
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
+body {
+  width: 70mm;
+  padding: 0 5mm;
+
+}
   .info-row { display:flex; justify-content:space-between; font-size:11px; margin-top:2px; margin-bottom:2px; }
   .info-row span:first-child { font-weight: normal; }
   .info-row span:last-child { font-weight: normal; }
@@ -503,12 +515,12 @@ const printReceipt = (history) => {
       <span>Order No: ${history.order_id || ''}</span>
       <span>Cashier : ${history.employee?.name || history.user?.name || ''}</span>
     </div>
-    
+
     <div class="info-row">
       <span>Customer : ${history.customer?.name || "..........................."}</span>
       <span>Billing Type : ${Number(history.is_whole || 0) > 0 ? "Wholesale" : "Retail"}</span>
     </div>
-    
+
     <div class="dotted-line"></div>
 
     <!-- PRODUCT TABLE -->
@@ -523,19 +535,19 @@ const printReceipt = (history) => {
       ${cash !== undefined && cash !== null ? `<div class="totals-row"><span>Cash</span><span>${parseFloat(cash).toFixed(2)}</span></div>` : ""}
       ${balance !== undefined && balance !== null ? `<div class="totals-row"><span>Balance</span><span>${parseFloat(balance).toFixed(2)}</span></div>` : ""}
     </div>
-    
+
     <div class="dotted-line"></div>
-    
+
     <div class="info-row">
       <span>${new Date(history.created_at || Date.now()).toLocaleDateString()} ${new Date(history.created_at || Date.now()).toLocaleTimeString()}</span>
       <span>${history.payment_method ? history.payment_method.charAt(0).toUpperCase() + history.payment_method.slice(1) : ""}</span>
     </div>
-    
+
     <div class="info-row">
       <span>Total Products</span>
       <span>${totalProducts}</span>
     </div>
-    
+
     <div class="dotted-line"></div>
 
     <div class="footer">

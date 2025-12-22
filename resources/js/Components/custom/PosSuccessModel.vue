@@ -252,6 +252,18 @@ const handlePrintReceipt = () => {
 <style>
   @media print { body { margin:0; padding:0; -webkit-print-color-adjust: none; background: white !important; } }
   body { background: white; font-size: 11px; font-family: Arial, sans-serif; margin:0; padding:10px; color:#000; }
+
+
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
+body {
+  width: 70mm;
+  padding: 0 5mm;
+
+}
   .info-row { display:flex; justify-content:space-between; font-size:11px; margin-top:2px; margin-bottom:2px; }
   .info-row span:first-child { font-weight: normal; }
   .info-row span:last-child { font-weight: normal; }
@@ -296,14 +308,14 @@ const handlePrintReceipt = () => {
       <span>Order No: ${props.orderid}</span>
       <span>Cashier : ${props.cashier?.name || ""}</span>
     </div>
-    
+
     <div class="info-row">
       <span>Customer : ${props.customer?.name || "..........................."}</span>
       <span>Billing Type : ${props.isWholesale ? "Wholesale" : "Retail"}</span>
     </div>
-    
-    
-    
+
+
+
     <div class="dotted-line"></div>
 
     <!-- PRODUCT TABLE -->
@@ -349,19 +361,19 @@ const handlePrintReceipt = () => {
           : ""
       }
     </div>
-    
+
     <div class="dotted-line"></div>
-    
+
     <div class="info-row">
       <span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</span>
       <span>${props.paymentMethod ? props.paymentMethod.charAt(0).toUpperCase() + props.paymentMethod.slice(1) : ""}</span>
     </div>
-    
+
     <div class="info-row">
       <span>Total Products</span>
       <span>${totalProductCount}</span>
     </div>
-    
+
     <div class="dotted-line"></div>
 
     <div class="footer">
