@@ -530,6 +530,7 @@ public function fetchProducts(Request $request)
         try {
             $validated = $request->validate([
                 'category_id' => 'nullable|exists:categories,id',
+                'supplier_id' => 'nullable|exists:suppliers,id',
                 'name' => 'required|string|max:255',
                 'size_id' => 'nullable|exists:sizes,id',
                 'color_id' => 'nullable|exists:colors,id',

@@ -29,10 +29,16 @@
             <div class="flex flex-col items-start justify-center w-full md:px-12">
               <div class="flex items-center justify-between w-full">
                 <h2 class="text-5xl font-bold text-black">Quotation </h2>
-                 <span class="flex cursor-pointer" @click="isSelectModalOpen = true">
-                    <p class="text-xl text-blue-600 font-bold">Product Manual</p>
-                    <img src="/images/selectpsoduct.svg" class="w-6 h-6 ml-2" />
-                </span>
+                 <span class="flex gap-4">
+                    <button @click="isCustomProductModalOpen = true" class="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="ri-add-line mr-2"></i>
+                        <p class="text-sm font-bold">Custom Product</p>
+                    </button>
+                    <span class="flex cursor-pointer" @click="isSelectModalOpen = true">
+                        <p class="text-xl text-blue-600 font-bold">Product Manual</p>
+                        <img src="/images/selectpsoduct.svg" class="w-6 h-6 ml-2" />
+                    </span>
+                 </span>
               </div>
               
 
@@ -180,45 +186,43 @@
             </div>
 
             <div class="mb-6">
-              <h3 class="text-lg font-semibold text-gray-800 mb-3">Products</h3>
               <div class="overflow-x-auto">
-                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
-                  <thead class="bg-gray-100 text-gray-700">
-                    <tr>
-                      <th class="px-4 py-2 text-left text-sm font-medium">Product</th>
-                      <th class="px-4 py-2 text-right text-sm font-medium">Quantity</th>
-                      <th class="px-4 py-2 text-right text-sm font-medium">Unit Price</th>
-                      <th class="px-4 py-2 text-right text-sm font-medium">Sub Total</th>
+                <table class="w-full border-collapse border border-gray-400">
+                  <thead>
+                    <tr class="bg-gray-200">
+                      <th class="border border-gray-400 px-4 py-3 text-left text-sm font-bold">Product</th>
+                      <th class="border border-gray-400 px-4 py-3 text-center text-sm font-bold">Qty</th>
+                      <th class="border border-gray-400 px-4 py-3 text-right text-sm font-bold">Unit Price</th>
+                      <th class="border border-gray-400 px-4 py-3 text-right text-sm font-bold">Sub Total</th>
                     </tr>
                   </thead>
-                        <tbody>
-                            <tr v-for="(item) in products" :key="item.id">
-                                <td class="px-4 py-2 text-gray-800 text-sm">{{ item.name }}</td>
-                                <td class="px-4 py-2 text-gray-800 text-right text-sm">{{ item.quantity }}</td>
-                                <td class="px-4 py-2 text-gray-800 text-right text-sm">{{ item.selling_price }}</td>                                <td class="px-4 py-2 text-gray-800 text-right text-sm">
-                                {{ (item.selling_price * item.quantity).toFixed(2) }}
-                                </td>
-                            </tr>
-                            </tbody>
+                  <tbody>
+                    <tr v-for="(item) in products" :key="item.id" class="hover:bg-gray-50">
+                      <td class="border border-gray-400 px-4 py-2 text-gray-800 text-sm">{{ item.name }}</td>
+                      <td class="border border-gray-400 px-4 py-2 text-gray-800 text-center text-sm">{{ item.quantity }}</td>
+                      <td class="border border-gray-400 px-4 py-2 text-gray-800 text-right text-sm">{{ item.selling_price }}</td>
+                      <td class="border border-gray-400 px-4 py-2 text-gray-800 text-right text-sm font-semibold">
+                        {{ (item.selling_price * item.quantity).toFixed(2) }}
+                      </td>
+                    </tr>
+                    <tr class="bg-gray-100 font-semibold">
+                      <td colspan="3" class="border border-gray-400 px-4 py-2 text-right text-sm">Total:</td>
+                      <td class="border border-gray-400 px-4 py-2 text-right text-sm">{{ total }} LKR</td>
+                    </tr>
+                    <tr v-if="parseFloat(totalDiscount) > 0" class="bg-gray-50">
+                      <td colspan="3" class="border border-gray-400 px-4 py-2 text-right text-sm">Discount:</td>
+                      <td class="border border-gray-400 px-4 py-2 text-right text-sm">{{ totalDiscount }} LKR</td>
+                    </tr>
+                    <tr v-if="description && description_price" class="bg-gray-50">
+                      <td colspan="3" class="border border-gray-400 px-4 py-2 text-right text-sm">{{ description }}:</td>
+                      <td class="border border-gray-400 px-4 py-2 text-right text-sm">{{ description_price }} LKR</td>
+                    </tr>
+                    <tr class="bg-gray-300 font-bold text-base">
+                      <td colspan="3" class="border border-gray-400 px-4 py-2 text-right">Grand Total:</td>
+                      <td class="border border-gray-400 px-4 py-2 text-right">{{ totalquotation }} LKR</td>
+                    </tr>
+                  </tbody>
                 </table>
-              </div>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-lg mb-6">
-              <h3 class="text-lg font-semibold text-gray-800 mb-3">Summary</h3>
-              <div class="grid grid-cols-2 gap-4">
-                
-                <p class="text-sm text-gray-500">Product Total:</p>
-                <p class="text-right text-sm font-semibold text-gray-800">{{total}}</p>
-                <p v-if="parseFloat(totalDiscount) > 0" class="text-sm text-gray-500">Discount:</p>
-                <p v-if="parseFloat(totalDiscount) > 0" class="text-right text-sm font-semibold text-gray-800">
-                {{ totalDiscount }}
-                </p>
-                <p class="text-sm text-gray-500">{{ description || " "}}</p>
-                <p class="text-right text-sm font-semibold text-gray-800">{{ description_price }}</p>
-                <p class="text-sm text-gray-500">Grand Quotation Total:</p>
-                <p class="text-right text-sm font-semibold text-gray-800">{{ totalquotation }}</p>                           
-            
-                             
               </div>
             </div>
 
@@ -244,6 +248,69 @@
     :sizes="sizes"
     @selected-products="handleSelectedProducts"
     />
+    
+    <!-- Custom Product Modal -->
+    <div v-if="isCustomProductModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Add Custom Product</h2>
+                <button @click="isCustomProductModalOpen = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="ri-close-line text-2xl"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
+                    <input
+                        v-model="customProduct.name"
+                        type="text"
+                        placeholder="Enter product name"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                    <input
+                        v-model.number="customProduct.quantity"
+                        type="number"
+                        min="1"
+                        placeholder="Enter quantity"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Unit Price (LKR)</label>
+                    <input
+                        v-model.number="customProduct.price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Enter unit price"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button
+                        @click="addCustomProduct"
+                        class="flex-1 bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 font-medium"
+                    >
+                        Add Product
+                    </button>
+                    <button
+                        @click="isCustomProductModalOpen = false"
+                        class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-md hover:bg-gray-400 font-medium"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <Footer />
 </template>
 
@@ -279,6 +346,12 @@ const validUntilDate = ref("");
 const description = ref("");
 const description_price = ref("");
 const add_discount = ref("");
+const isCustomProductModalOpen = ref(false);
+const customProduct = ref({
+    name: "",
+    quantity: 1,
+    price: 0,
+});
 
 
 
@@ -406,6 +479,7 @@ const totalDiscount = computed(() => {
         ? Number(appliedCoupon.value.discount)
         : 0;
 
+    // Get discount from the reactive add_discount value
     const additionalDiscount = parseFloat(add_discount.value) || 0;
 
     return (productDiscount + couponDiscount + additionalDiscount).toFixed(2);
@@ -443,6 +517,10 @@ const totalquotation = computed(() => {
 const form = useForm({
     employee_id: "",
     barcode: "", // Form field for barcode
+    description: "",
+    description_price: "",
+    add_discount: "",
+    valid_date: "",
 });
 
 const couponForm = useForm({
@@ -598,18 +676,37 @@ const handleSelectedProducts = (selectedProducts) => {
   });
 };
 
+const addCustomProduct = () => {
+  if (!customProduct.value.name || customProduct.value.quantity <= 0 || customProduct.value.price < 0) {
+    isAlertModalOpen.value = true;
+    message.value = "Please fill in all custom product fields correctly";
+    return;
+  }
+
+  products.value.push({
+    id: `custom_${Date.now()}`, // Unique ID for custom products
+    name: customProduct.value.name,
+    quantity: parseInt(customProduct.value.quantity),
+    selling_price: parseFloat(customProduct.value.price),
+    image: null,
+    is_custom: true, // Flag to identify custom products
+    apply_discount: false,
+  });
+
+  // Reset the form
+  customProduct.value = {
+    name: "",
+    quantity: 1,
+    price: 0,
+  };
+  isCustomProductModalOpen.value = false;
+};
+
 const addQuotation = () => {
   validUntilDate.value = form.valid_date;
   description.value = form.description;
   description_price.value = form.description_price;
   add_discount.value = form.add_discount;
-
-  const quotationTotal = computed(() => {
-  const totalValue = parseFloat(total.value) || 0;
-  const additionalCharge = parseFloat(description_price.value) || 0;
-
-  return (totalValue + additionalCharge ).toFixed(2);
-});
 };
 
 const downloadPdf = async () => {
@@ -702,77 +799,123 @@ const downloadPdf = async () => {
   }
   
   // Rest of the PDF generation code remains the same
-  const tableHeaders = ['Product', 'Qty', 'Unit Price', 'Sub Total'];
+  const pageWidth = pdf.internal.pageSize.getWidth();
   const startY = props.companyInfo && props.companyInfo.logo ? 100 : 75;
   
-  // Style for table header
-  pdf.setFillColor(240, 240, 240);
-  pdf.rect(15, startY - 5, 165, 8, 'F');
-  pdf.setFont('helvetica', 'bold');
+  // Table configuration
+  const margin = 15;
+  const colWidths = [80, 25, 35, 35]; // Product, Qty, Unit Price, Sub Total
+  const actualTableWidth = colWidths.reduce((sum, width) => sum + width, 0);
   
-  // Add table headers
-  pdf.text(tableHeaders[0], 15, startY);
-  pdf.text(tableHeaders[1], 100, startY, { align: 'right' });
-  pdf.text(tableHeaders[2], 130, startY, { align: 'right' });
-  pdf.text(tableHeaders[3], 170, startY, { align: 'right' });
+  // Calculate column X positions
+  const cols = [margin];
+  for (let i = 0; i < colWidths.length - 1; i++) {
+    cols.push(cols[i] + colWidths[i]);
+  }
   
-  // Add products
-  let currentY = startY + 10;
-  pdf.setFont('helvetica', 'normal');
+  // Helper function to draw a table row
+  const drawTableRow = (y, height, data, isHeader = false, fillColor = null) => {
+    // Draw background if specified
+    if (fillColor) {
+      pdf.setFillColor(...fillColor);
+      pdf.rect(margin, y, actualTableWidth, height, 'F');
+    }
+    
+    // Draw borders
+    pdf.setDrawColor(0);
+    pdf.setLineWidth(0.5);
+    
+    // Horizontal lines
+    pdf.line(margin, y, margin + actualTableWidth, y); // top
+    pdf.line(margin, y + height, margin + actualTableWidth, y + height); // bottom
+    
+    // Vertical lines
+    for (let i = 0; i <= cols.length; i++) {
+      const x = i === cols.length ? margin + actualTableWidth : cols[i];
+      pdf.line(x, y, x, y + height);
+    }
+    
+    // Add text
+    if (data) {
+      pdf.setFont('helvetica', isHeader ? 'bold' : 'normal');
+      pdf.setFontSize(isHeader ? 10 : 9);
+      const textY = y + height / 2 + 2;
+      
+      // Product name (left aligned)
+      if (data[0]) {
+        pdf.text(data[0], cols[0] + 2, textY);
+      }
+      
+      // Quantity (center aligned)
+      if (data[1]) {
+        pdf.text(data[1], cols[1] + colWidths[1] / 2, textY, { align: 'center' });
+      }
+      
+      // Unit Price (right aligned)
+      if (data[2]) {
+        pdf.text(data[2], cols[2] + colWidths[2] - 2, textY, { align: 'right' });
+      }
+      
+      // Sub Total (right aligned)
+      if (data[3]) {
+        pdf.text(data[3], cols[3] + colWidths[3] - 2, textY, { align: 'right' });
+      }
+    }
+  };
   
+  let currentY = startY;
+  
+  // Draw header
+  drawTableRow(currentY, 8, ['Product', 'Qty', 'Unit Price', 'Sub Total'], true, [200, 200, 200]);
+  currentY += 8;
+  
+  // Draw product rows
   products.value.forEach((item) => {
-    if (currentY > 270) {
+    if (currentY > 260) {
       pdf.addPage();
       currentY = 20;
     }
     
     const itemName = item.name || 'Unnamed Product';
     const quantity = item.quantity?.toString() || '0';
-    const price = item.selling_price?.toString() || '0';
-    const subtotal = (item.selling_price * item.quantity).toFixed(2);
+    const price = parseFloat(item.selling_price)?.toFixed(2) || '0.00';
+    const subtotal = (parseFloat(item.selling_price) * item.quantity).toFixed(2);
     
-    pdf.text(itemName, 15, currentY);
-    pdf.text(quantity, 100, currentY, { align: 'right' });
-    pdf.text(price, 130, currentY, { align: 'right' });
-    pdf.text(subtotal, 170, currentY, { align: 'right' });
+    drawTableRow(currentY, 6, [itemName, quantity, price, subtotal]);
     
-    currentY += 8;
+    // Add custom product indicator if applicable
+    if (item.is_custom) {
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(7);
+      pdf.text('(Custom)', cols[0] + 2, currentY + 4);
+    }
+    
+    currentY += 6;
   });
   
-  // Add summary section
-  currentY += 10;
+  // Draw total row
+  drawTableRow(currentY, 6, ['', '', 'Total:', `${total.value} LKR`], true, [220, 220, 220]);
+  currentY += 6;
   
-  if (currentY > 250) {
-    pdf.addPage();
-    currentY = 20;
-  }
-  
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('Summary:', 15, currentY);
-  currentY += 10;
-  
-  let summaryItems = [['Product Total:', total.value || '0.00']];
-  
+  // Draw discount row (if applicable)
   if (parseFloat(totalDiscount.value) > 0) {
-    summaryItems.push(['Discount:', totalDiscount.value]);
+    drawTableRow(currentY, 5, ['', '', 'Discount:', `${totalDiscount.value} LKR`]);
+    currentY += 5;
   }
   
+  // Draw additional charges row (if applicable)
   if (description.value && description_price.value) {
-    summaryItems.push([description.value, description_price.value]);
+    drawTableRow(currentY, 5, ['', '', `${description.value}:`, `${description_price.value} LKR`]);
+    currentY += 5;
   }
   
-  summaryItems.push(['Grand Total:', totalquotation.value || '0.00']);
-  
-  summaryItems.forEach(([label, value]) => {
-    pdf.text(label, 15, currentY);
-    pdf.text(`${value} LKR`, 170, currentY, { align: 'right' });
-    currentY += 7;
-  });
+  // Draw grand total row
+  drawTableRow(currentY, 7, ['', '', 'Grand Total:', `${totalquotation.value} LKR`], true, [180, 180, 180]);
 
   // Add footer
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(smallSize);
-  pdf.text('Thank you for your business!', 105, 280, { align: 'center' });
+  pdf.text('Thank you for your business!', pageWidth / 2, 280, { align: 'center' });
   
   // Save PDF
   pdf.save(`Quotation_${orderId.value}.pdf`);
