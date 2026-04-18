@@ -54,7 +54,7 @@ class PosController extends Controller
         $returnReasons = ReturnReason::pluck('reason', 'id');
         $colors = Color::pluck('name', 'id');
         $sizes = Size::pluck('name', 'id');
-        $allemployee = Employee::pluck('name', 'id');
+        $allemployee = Employee::select('id', 'name')->get();
 
         // Render the page for GET requests
         return Inertia::render('Pos/Index', [
