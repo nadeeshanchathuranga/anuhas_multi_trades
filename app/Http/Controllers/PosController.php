@@ -35,18 +35,26 @@ class PosController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $allcategories = Category::with('parent')->get()->map(function ($category) {
-            $category->hierarchy_string = $category->name; // Corrected assignment
-            return $category;
-        });
-        $sales = Sale::with('customer','employee')->get();
-        $saleItems  = SaleItem::with('product')->orderBy('created_at', 'desc')->get();
+        // Limit categories to only necessary data (avoid loading all with relations)
+        $allcategories = Category::select('id', 'name', 'parent_id')->get();
 
+        // Paginate to most recent 100 sales instead of loading all
+        $sales = Sale::with('customer', 'employee')
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
 
-        $returnReasons = ReturnReason::orderBy('created_at', 'desc')->get();
-        $colors = Color::orderBy('created_at', 'desc')->get();
-        $sizes = Size::orderBy('created_at', 'desc')->get();
-        $allemployee = Employee::orderBy('created_at', 'desc')->get();
+        // Paginate to most recent 100 sale items instead of loading all
+        $saleItems = SaleItem::with('product')
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
+
+        // Use pluck for dropdown data - more efficient than full records
+        $returnReasons = ReturnReason::pluck('reason', 'id');
+        $colors = Color::pluck('name', 'id');
+        $sizes = Size::pluck('name', 'id');
+        $allemployee = Employee::pluck('name', 'id');
 
         // Render the page for GET requests
         return Inertia::render('Pos/Index', [
@@ -58,7 +66,7 @@ class PosController extends Controller
             'colors' => $colors,
             'returnReasons' => $returnReasons,
             'sizes' => $sizes,
-               'sales'=> $sales,
+            'sales' => $sales,
             'saleItems' => $saleItems,
         ]);
     }

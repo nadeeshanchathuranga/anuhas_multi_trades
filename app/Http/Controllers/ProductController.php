@@ -152,28 +152,27 @@ public function fetchProducts(Request $request)
         // Total filtered products
         $totalProducts = $products->total();
 
-        // Other dropdown / alert data
-        $allcategories = Category::with('parent')->get()->map(function ($category) {
-            $category->hierarchy_string = $category->hierarchy_string;
-            return $category;
-        });
+        // Other dropdown / alert data - Use pluck for dropdowns to save memory
+        $allcategories = Category::select('id', 'name', 'parent_id')->get();
 
-        $preOrderProducts = Product::with(['category', 'supplier', 'color', 'size'])
+        // Limit preorder alerts to only products that need attention
+        $preOrderProducts = Product::select('id', 'name', 'total_quantity', 'preorder_level_qty', 'category_id', 'supplier_id')
             ->whereColumn('total_quantity', '<=', 'preorder_level_qty')
+            ->limit(50)  // Limit to top 50 alerts instead of fetching all
             ->get();
 
         $preOrderAlertCount = $preOrderProducts->count();
 
-        $expiryProducts = Product::with(['category', 'supplier'])
+        // Calculate only products that are actually expiring soon (in DB query)
+        $expiryProducts = Product::select('id', 'name', 'expire_date', 'expiry_date_margin', 'category_id', 'supplier_id')
             ->whereNotNull('expire_date')
+            ->where('expire_date', '<=', Carbon::now()->addDays(DB::raw('expiry_date_margin')))
+            ->limit(50)  // Limit to top 50 expiring products
             ->get()
             ->map(function ($product) {
                 $product->days_left = Carbon::now()->diffInDays(Carbon::parse($product->expire_date), false);
-                $product->within_margin = $product->days_left <= $product->expiry_date_margin;
                 return $product;
-            })
-            ->filter(fn($p) => $p->within_margin)
-            ->values();
+            });
 
         $expiryAlertCount = $expiryProducts->count();
 
@@ -181,9 +180,9 @@ public function fetchProducts(Request $request)
             'products' => $products,
             'rawProducts' => $products->items(), // send current page items for barcode modal
             'allcategories' => $allcategories,
-            'colors' => Color::latest()->get(),
-            'sizes' => Size::latest()->get(),
-            'suppliers' => Supplier::latest()->get(),
+            'colors' => Color::pluck('name', 'id'),
+            'sizes' => Size::pluck('name', 'id'),
+            'suppliers' => Supplier::pluck('name', 'id'),
             'totalProducts' => $totalProducts,
             'search' => $query,
             'sort' => $sortOrder,

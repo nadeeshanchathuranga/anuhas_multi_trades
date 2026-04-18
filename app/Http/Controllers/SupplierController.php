@@ -19,27 +19,21 @@ class SupplierController extends Controller
 
     public function index()
     {
-
-  
-
-
-
+        // Paginate and limit eager loaded relationships
         $allsuppliers = Supplier::with([
-    'numbers' => function ($query) {
-        $query->orderBy('id', 'desc');
-    },
-    'products' => function ($query) {
-        $query->select('id', 'supplier_id', 'name', 'cost_price', 'total_quantity');
-    }
-])
-->orderBy('id', 'desc')
-->get();
-
-
+            'numbers' => function ($query) {
+                $query->orderBy('id', 'desc')->limit(10);  // Limit related numbers
+            },
+            'products' => function ($query) {
+                $query->select('id', 'supplier_id', 'name', 'cost_price', 'total_quantity')->limit(10);  // Limit products
+            }
+        ])
+        ->orderBy('id', 'desc')
+        ->paginate(50);
 
         return Inertia::render('Suppliers/Index', [
             'allsuppliers' => $allsuppliers,
-            'totalSuppliers' => $allsuppliers->count()
+            'totalSuppliers' => $allsuppliers->total()
         ]);
     }
 

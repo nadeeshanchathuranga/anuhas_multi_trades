@@ -28,74 +28,80 @@ class CreditController extends Controller
      */
     public function index()
     {
-        $creditBills = CreditBill::with([
+        $creditBillsQuery = CreditBill::with([
                 'customer:id,name',
                 'employee:id,name',
                 'payments' => function($query) {
                     $query->orderBy('created_at', 'desc');
                 }
             ])
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($bill) {
-                // Recalculate paid_amount from payments to ensure accuracy
-                $totalPaid = (float) $bill->payments->sum('amount');
+            ->orderBy('created_at', 'desc');
 
-                \Log::info('Processing bill', [
-                    'bill_id' => $bill->id,
-                    'db_paid_amount' => $bill->paid_amount,
-                    'calculated_paid_amount' => $totalPaid,
-                    'payments_count' => $bill->payments->count()
-                ]);
+        // Paginate to limit memory usage
+        $creditBillsPaginated = $creditBillsQuery->paginate(50);
 
-                // Update the credit bill if there's a discrepancy
-                if ($totalPaid != $bill->paid_amount) {
-                    $bill->paid_amount = $totalPaid;
+        $creditBills = $creditBillsPaginated->items();
+        
+        $creditBills = array_map(function ($bill) {
+            // Recalculate paid_amount from payments to ensure accuracy
+            $totalPaid = (float) $bill->payments->sum('amount');
 
-                    // Update status based on payment
-                    if ($totalPaid >= $bill->total_amount) {
-                        $bill->status = 'completed';
-                    } elseif ($totalPaid > 0) {
-                        $bill->status = 'partial';
-                    } else {
-                        $bill->status = 'pending';
-                    }
+            \Log::info('Processing bill', [
+                'bill_id' => $bill->id,
+                'db_paid_amount' => $bill->paid_amount,
+                'calculated_paid_amount' => $totalPaid,
+                'payments_count' => $bill->payments->count()
+            ]);
 
-                    $bill->save();
+            // Update the credit bill if there's a discrepancy
+            if ($totalPaid != $bill->paid_amount) {
+                $bill->paid_amount = $totalPaid;
+
+                // Update status based on payment
+                if ($totalPaid >= $bill->total_amount) {
+                    $bill->status = 'completed';
+                } elseif ($totalPaid > 0) {
+                    $bill->status = 'partial';
+                } else {
+                    $bill->status = 'pending';
                 }
 
-                $pending = max(0, $bill->total_amount - $totalPaid);
+                $bill->save();
+            }
 
-                return [
-                    'id' => $bill->id,
-                    'order_id' => $bill->order_id,
-                    'customer_name' => $bill->customer ? $bill->customer->name : '-',
-                    'employee_name' => $bill->employee ? $bill->employee->name : '-',
-                    'total_amount' => (float) $bill->total_amount,
-                    'paid_amount' => (float) $totalPaid,
-                    'pending_amount' => (float) $pending,
-                    'status' => ucfirst($bill->status),
-                    'sale_date' => $bill->sale_date->format('Y-m-d'),
-                    'payment_method' => $bill->payment_method,
-                    'payments' => $bill->payments->map(function ($payment) {
-                        return [
-                            'id' => $payment->id,
-                            'amount' => (float) $payment->amount,
-                            'payment_method' => $payment->payment_method,
-                            'description' => $payment->description ?? '',
-                            'date' => $payment->created_at->format('Y-m-d H:i'),
-                        ];
-                    })->values()->toArray(),
-                ];
-            })->values()->toArray();
+            $pending = max(0, $bill->total_amount - $totalPaid);
 
-        $customers = Customer::select('id', 'name')->orderBy('name')->get()->toArray();
+            return [
+                'id' => $bill->id,
+                'order_id' => $bill->order_id,
+                'customer_name' => $bill->customer ? $bill->customer->name : '-',
+                'employee_name' => $bill->employee ? $bill->employee->name : '-',
+                'total_amount' => (float) $bill->total_amount,
+                'paid_amount' => (float) $totalPaid,
+                'pending_amount' => (float) $pending,
+                'status' => ucfirst($bill->status),
+                'sale_date' => $bill->sale_date->format('Y-m-d'),
+                'payment_method' => $bill->payment_method,
+                'payments' => $bill->payments->map(function ($payment) {
+                    return [
+                        'id' => $payment->id,
+                        'amount' => (float) $payment->amount,
+                        'payment_method' => $payment->payment_method,
+                        'description' => $payment->description ?? '',
+                        'date' => $payment->created_at->format('Y-m-d H:i'),
+                    ];
+                })->values()->toArray(),
+            ];
+        }, $creditBills);
+
+        $customers = Customer::select('id', 'name')->orderBy('name')->pluck('name', 'id')->toArray();
 
         // Log the data being sent
         \Log::info('Sending credit bills:', ['data' => $creditBills]);
 
         return Inertia::render('CreditPayment/Index', [
-            'creditBills' => $creditBills,
+            'creditBills' => $creditBillsPaginated,
+            'creditBillsData' => $creditBills,
             'customers' => $customers,
         ]);
     }

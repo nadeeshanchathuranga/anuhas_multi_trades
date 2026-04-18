@@ -15,11 +15,11 @@ class CouponController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $allcoupons = Coupon::orderBy('id', 'desc')->get(); //
+        $allcoupons = Coupon::orderBy('id', 'desc')->paginate(50);
 
         return Inertia::render('Coupon/Index', [
             'allCoupons' => $allcoupons,
-            'totalCoupons' => $allcoupons->count(),
+            'totalCoupons' => $allcoupons->total(),
         ]);
     }
 

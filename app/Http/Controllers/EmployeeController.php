@@ -17,13 +17,11 @@ class EmployeeController extends Controller
         if (!Gate::allows('hasRole', ['Admin','Manager'])) {
             abort(403, 'Unauthorized');
         }
-        $allemployee = Employee::orderBy('id', 'desc')->get();
-
-
+        $allemployee = Employee::orderBy('id', 'desc')->paginate(50);
 
         return Inertia::render('Employee/Index', [
             'allemployee' => $allemployee,
-            'totalEmployee' => $allemployee->count()
+            'totalEmployee' => $allemployee->total()
         ]);
     }
 

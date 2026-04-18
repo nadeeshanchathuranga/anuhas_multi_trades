@@ -23,12 +23,12 @@ class ExpenseNewController extends Controller
 
         $expenses = ExpenseNew::query()
             ->latest('id')
-            ->get();
+            ->paginate(50);
 
         return Inertia::render('ExpenseNew/Index', [
             'expenses'      => $expenses,
-            'totalExpenses' => $expenses->count(),
-            'sumAmount'     => $expenses->sum('amount'),
+            'totalExpenses' => $expenses->total(),
+            'sumAmount'     => ExpenseNew::sum('amount'),
         ]);
     }
 

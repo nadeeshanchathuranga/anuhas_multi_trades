@@ -23,23 +23,18 @@ class QuotationController extends Controller
      */
     public function index()
     { 
-
         if (!Gate::allows('hasRole', ['Admin', 'Cashier'])) {
             abort(403, 'Unauthorized');
         }
 
-        $allcategories = Category::with('parent')->get()->map(function ($category) {
-            $category->hierarchy_string = $category->hierarchy_string; // Access it
-            return $category;
-        });
-        $colors = Color::orderBy('created_at', 'desc')->get();
-        $sizes = Size::orderBy('created_at', 'desc')->get();
-        $allemployee = Employee::orderBy('created_at', 'desc')->get();
-        $companyInfo = CompanyInfo::first();
+        // Fetch only necessary columns for categories
+        $allcategories = Category::select('id', 'name', 'parent_id')->get();
         
-
-
-        // Render the page for GET requests
+        // Use pluck for dropdown data to save memory
+        $colors = Color::pluck('name', 'id');
+        $sizes = Size::pluck('name', 'id');
+        $allemployee = Employee::pluck('name', 'id');
+        $companyInfo = CompanyInfo::first();
         return Inertia::render('Quotations/Index', [
             'allcategories' => $allcategories,
             'colors' => $colors,

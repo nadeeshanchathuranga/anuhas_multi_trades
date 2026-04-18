@@ -21,16 +21,21 @@ class ReturnItemController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $sales = Sale::with('customer')->orderBy('created_at', 'desc')->get();
-        $saleItems  = SaleItem::with('product')->orderBy('created_at', 'desc')->get();
-
-
-
+        // Limit to recent 100 sales instead of all
+        $sales = Sale::with('customer')
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
+        
+        // Limit to recent 100 sale items instead of all
+        $saleItems = SaleItem::with('product')
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
 
         return Inertia::render('ReturnItem/Index', [
             'sales' => $sales,
             'saleItems' => $saleItems,
-
         ]);
     }
 

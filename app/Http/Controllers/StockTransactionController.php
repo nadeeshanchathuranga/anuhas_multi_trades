@@ -15,12 +15,13 @@ class StockTransactionController extends Controller
 
      public function index()
      {
-         $allStockTransactions = StockTransaction::with('product.supplier')->orderBy('id', 'desc')->get();
-
+         $allStockTransactions = StockTransaction::with('product.supplier')
+             ->orderBy('id', 'desc')
+             ->paginate(50);
 
          return Inertia::render('StockTransaction/Index', [
              'allStockTransactions' => $allStockTransactions,
-             'totalStockTransactions' => $allStockTransactions->count()
+             'totalStockTransactions' => $allStockTransactions->total()
          ]);
      }
 

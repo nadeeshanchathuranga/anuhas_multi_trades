@@ -42,7 +42,7 @@ class ReportController extends Controller
             }
         };
 
-        // -------- Top Products (sold in range via Sale.created_at) --------
+        // -------- Top Products (sold in range via Sale.created_at) - Paginate to limit memory --------
         if ($from || $to) {
             $productIds = SaleItem::whereHas('sale', function ($q) use ($applyCreatedWindow) {
                     $applyCreatedWindow($q);
@@ -52,19 +52,22 @@ class ReportController extends Controller
 
             $products = Product::whereIn('id', $productIds)
                 ->orderBy('created_at', 'desc')
+                ->limit(100)  // Limit display to top 100 products
                 ->get();
         } else {
-            $products = Product::orderBy('created_at', 'desc')->get();
+            $products = Product::orderBy('created_at', 'desc')
+                ->limit(100)  // Limit display to top 100 products
+                ->get();
         }
 
-        // -------- Sales (filter by created_at) --------
+        // -------- Sales (filter by created_at) - Paginate to limit memory --------
         $salesQuery = Sale::with(['saleItems.product.category', 'employee', 'customer']);
 
         if ($from || $to) {
             $applyCreatedWindow($salesQuery);
         }
 
-        // -------- Credit Bills (filter by payment dates, not creation date) --------
+        // -------- Credit Bills (filter by payment dates, not creation date) - Paginate to limit memory --------
         $creditBillsQuery = \App\Models\CreditBill::with(['customer', 'employee', 'payments' => function($query) use ($from, $to) {
             // Filter payments by date range
             if ($from) {
@@ -90,10 +93,15 @@ class ReportController extends Controller
             $creditBillsQuery->where('paid_amount', '>', 0);
         }
 
-        $creditBills = $creditBillsQuery->orderBy('created_at', 'desc')->get();
+        // For display, limit to 100; for calculations, get distinct count
+        $creditBillsForDisplay = (clone $creditBillsQuery)->orderBy('created_at', 'desc')->limit(100)->get();
+        $creditBillsForCalculation = (clone $creditBillsQuery)->orderBy('created_at', 'desc')->get();
 
-        // Recalculate paid_amount based on filtered payments
-        $creditBills->each(function($bill) {
+        // Recalculate paid_amount based on filtered payments (for both display and calculation)
+        $creditBillsForDisplay->each(function($bill) {
+            $bill->filtered_paid_amount = $bill->payments->sum('amount');
+        });
+        $creditBillsForCalculation->each(function($bill) {
             $bill->filtered_paid_amount = $bill->payments->sum('amount');
         });
 
@@ -115,7 +123,9 @@ class ReportController extends Controller
             return $product;
         });
 
-        $sales = $salesQuery->orderBy('created_at', 'desc')->get();
+        // For display, limit sales; for calculations, get all
+        $salesForDisplay = (clone $salesQuery)->orderBy('created_at', 'desc')->limit(100)->get();
+        $salesForCalculation = (clone $salesQuery)->orderBy('created_at', 'desc')->get();
 
         // Helpers
         $customDiscountToLkr = function ($sale) {
@@ -130,9 +140,9 @@ class ReportController extends Controller
             return $productDiscount + $customDiscount;
         };
 
-        // Category totals (from filtered sales)
+        // Category totals (from filtered sales - use full calculation data)
         $categorySales = [];
-        foreach ($sales as $sale) {
+        foreach ($salesForCalculation as $sale) {
             foreach ($sale->saleItems as $item) {
                 $categoryName = $item->product->category->name ?? 'No Category';
                 $categorySales[$categoryName] = ($categorySales[$categoryName] ?? 0) + (float) $item->total_price;
@@ -140,22 +150,22 @@ class ReportController extends Controller
         }
 
         // Payment totals - for regular sales use full amount, for credit bills use paid amount only
-        $paymentMethodTotals = $sales->groupBy('payment_method')->map(
+        $paymentMethodTotals = $salesForCalculation->groupBy('payment_method')->map(
             fn($g) => (float) $g->sum('total_amount')
         )->toArray();
 
         // Add credit bill payments to payment method totals
         // Use actual payment methods from the filtered payments
-        foreach ($creditBills as $cb) {
+        foreach ($creditBillsForCalculation as $cb) {
             foreach ($cb->payments as $payment) {
                 $method = $payment->payment_method;
                 $paymentMethodTotals[$method] = ($paymentMethodTotals[$method] ?? 0) + (float) $payment->amount;
             }
         }
 
-        // Employee sales (NET)
+        // Employee sales (NET) - use full calculation data
         $employeeSalesSummary = [];
-        foreach ($sales as $sale) {
+        foreach ($salesForCalculation as $sale) {
             if (!$sale->employee) continue;
             $name = $sale->employee->name;
             $employeeSalesSummary[$name] ??= [
@@ -167,19 +177,19 @@ class ReportController extends Controller
             $employeeSalesSummary[$name]['Total Sales Amount'] += ($gross - $totalDisc);
         }
 
-        // Overall stats from regular sales
-        $totalSaleAmount         = (float) $sales->sum('total_amount');
-        $totalCost               = (float) $sales->sum('total_cost');
-        $totalProductDiscountLkr = (float) $sales->sum('discount');
-        $totalCustomDiscountLkr  = (float) $sales->reduce(function($c, $s) use ($customDiscountToLkr) { return $c + $customDiscountToLkr($s); }, 0.0);
-        $totalAllDiscountLkr     = (float) $sales->reduce(function($c, $s) use ($totalDiscountToLkr) { return $c + $totalDiscountToLkr($s); }, 0.0);
+        // Overall stats from regular sales - use full calculation data
+        $totalSaleAmount         = (float) $salesForCalculation->sum('total_amount');
+        $totalCost               = (float) $salesForCalculation->sum('total_cost');
+        $totalProductDiscountLkr = (float) $salesForCalculation->sum('discount');
+        $totalCustomDiscountLkr  = (float) $salesForCalculation->reduce(function($c, $s) use ($customDiscountToLkr) { return $c + $customDiscountToLkr($s); }, 0.0);
+        $totalAllDiscountLkr     = (float) $salesForCalculation->reduce(function($c, $s) use ($totalDiscountToLkr) { return $c + $totalDiscountToLkr($s); }, 0.0);
 
-        // Credit bills - only count payments made in the filtered date range
-        $totalCreditBillPaidAmount = (float) $creditBills->sum('filtered_paid_amount');
+        // Credit bills - only count payments made in the filtered date range - use full calculation data
+        $totalCreditBillPaidAmount = (float) $creditBillsForCalculation->sum('filtered_paid_amount');
 
-        // Calculate the proportion of payment to apply costs and discounts
+        // Calculate the proportion of payment to apply costs and discounts - use full calculation data
         $totalCreditDiscountLkr = 0;
-        foreach ($creditBills as $cb) {
+        foreach ($creditBillsForCalculation as $cb) {
             if ($cb->total_amount > 0) {
                 // Use filtered paid amount (payments in date range)
                 $paymentRatio = $cb->filtered_paid_amount / $cb->total_amount;
@@ -198,46 +208,51 @@ class ReportController extends Controller
         $totalRevenue = $totalSaleAmount + $totalCreditBillPaidAmount;
         $netProfit = $totalRevenue - $totalCost - $totalAllDiscountLkr;
 
-        $totalTransactions       = $sales->count() + $creditBills->count();
+        $totalTransactions       = $salesForCalculation->count() + $creditBillsForCalculation->count();
         $averageTransactionValue = $totalTransactions > 0 ? ($totalRevenue / $totalTransactions) : 0;
 
         // Distinct customers (same filter)
         $totalCustomer = (clone $salesQuery)->distinct('customer_id')->count('customer_id');
 
-        // -------- Expenses (filter by created_at) --------
+        // -------- Expenses (filter by created_at) - Paginate for display --------
         $expenseQuery = ExpenseNew::query();
         if ($from || $to) {
             $applyCreatedWindow($expenseQuery);
         }
-        $expenses = $expenseQuery->orderBy('created_at', 'desc')->get();
-        $totalExpenseAmount = (float) $expenses->sum('amount');
-        $totalExpenseCount  = $expenses->count();
+        $expensesForDisplay = $expenseQuery->orderBy('created_at', 'desc')->limit(100)->get();
+        $expensesForCalculation = (clone $expenseQuery)->orderBy('created_at', 'desc')->get();
+        
+        $totalExpenseAmount = (float) $expensesForCalculation->sum('amount');
+        $totalExpenseCount  = $expensesForCalculation->count();
 
-        // -------- In Cash Records (filter by created_at) --------
+        // -------- In Cash Records (filter by created_at) - Paginate for display --------
         $inCashQuery = InCash::query();
         if ($from || $to) {
             $applyCreatedWindow($inCashQuery);
         }
-        $inCashRecords = $inCashQuery->orderBy('created_at', 'desc')->get();
-        $totalInCashAmount = (float) $inCashRecords->sum('amount');
-        $totalInCashCount = $inCashRecords->count();
+        $inCashRecordsForDisplay = $inCashQuery->orderBy('created_at', 'desc')->limit(100)->get();
+        $inCashRecordsForCalculation = (clone $inCashQuery)->orderBy('created_at', 'desc')->get();
+        
+        $totalInCashAmount = (float) $inCashRecordsForCalculation->sum('amount');
+        $totalInCashCount = $inCashRecordsForCalculation->count();
 
-        // -------- Stock Transactions Return --------
+        // -------- Stock Transactions Return - Limit to reduce memory --------
         $stockTransactionsReturn = StockTransaction::with('product')
             ->where('transaction_type', 'Returned')
-            ->get();
+            ->limit(100);
 
         if ($startDateRaw && $endDateRaw) {
-            $stockTransactionsReturn = StockTransaction::with('product')
-                ->where('transaction_type', 'Returned')
-                ->whereBetween('transaction_date', [$startDateRaw, $endDateRaw])
-                ->get();
+            $stockTransactionsReturn->whereBetween('transaction_date', [$startDateRaw, $endDateRaw]);
         }
+        
+        $stockTransactionsReturn = $stockTransactionsReturn->get();
 
         return Inertia::render('Reports/Index', [
             'products'                  => $products,
-            'sales'                     => $sales,
-            'creditBills'               => $creditBills,
+            'sales'                     => $salesForDisplay,
+            'creditBills'               => $creditBillsForDisplay,
+            'expenses'                  => $expensesForDisplay,
+            'inCashRecords'             => $inCashRecordsForDisplay,
 
             'totalSaleAmount'           => round($totalSaleAmount, 2),
             'totalCreditBillPaidAmount' => round($totalCreditBillPaidAmount, 2),
@@ -257,11 +272,9 @@ class ReportController extends Controller
             'employeeSalesSummary'      => $employeeSalesSummary,
             'paymentMethodTotals'       => $paymentMethodTotals,
 
-            'expenses'                  => $expenses,
             'totalExpenseAmount'        => round($totalExpenseAmount, 2),
             'totalExpenseCount'         => $totalExpenseCount,
 
-            'inCashRecords'             => $inCashRecords,
             'totalInCashAmount'         => round($totalInCashAmount, 2),
             'totalInCashCount'          => $totalInCashCount,
 

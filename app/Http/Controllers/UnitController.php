@@ -15,11 +15,11 @@ class UnitController extends Controller
             abort(403, 'Unauthorized');
         }
 
-       $allunits = Unit::orderBy('created_at', 'desc')->get(); 
+        $allunits = Unit::orderBy('created_at', 'desc')->paginate(50);
 
         return Inertia::render('Unit/Index', [
             'allunits' => $allunits,
-            'totalUnits' => $allunits->count(),
+            'totalUnits' => $allunits->total(),
         ]);
     }
 

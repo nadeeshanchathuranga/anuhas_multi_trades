@@ -16,17 +16,16 @@ class UserController extends Controller
 
 
  public function index()
-{
-    $allusers = User::select('id','name','email','role_type','created_at')
-        ->orderBy('id','desc')->get();
+    {
+        $allusers = User::select('id', 'name', 'email', 'role_type', 'created_at')
+            ->orderBy('id', 'desc')
+            ->paginate(50);
 
-      
-
-    return Inertia::render('Users/Index', [
-        'allusers'   => $allusers,
-        'totalUsers' => $allusers->count(),
-    ]);
-}
+        return Inertia::render('Users/Index', [
+            'allusers'   => $allusers,
+            'totalUsers' => $allusers->total(),
+        ]);
+    }
 
 
     // POST /users

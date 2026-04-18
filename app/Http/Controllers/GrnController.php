@@ -16,11 +16,13 @@ class GrnController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $allgrns = Grn::with('products')->orderBy('id', 'desc')->get();
+        $allgrns = Grn::with('products')
+            ->orderBy('id', 'desc')
+            ->paginate(50);
 
         return Inertia::render('Grn/Index', [
             'allgrns' => $allgrns,
-            'totalGrns' => $allgrns->count(),
+            'totalGrns' => $allgrns->total(),
         ]);
     }
 

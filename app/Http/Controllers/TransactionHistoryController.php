@@ -15,19 +15,19 @@ use Illuminate\Support\Facades\Gate;
 class TransactionHistoryController extends Controller
 {
     public function index()
-{
-    $allhistoryTransactions = Sale::with(['saleItems','saleItems.product','saleItems.customProduct','saleItems.printout','customer','user','cheque'])
-        ->orderBy('id', 'desc')
-        ->get();
+    {
+        $allhistoryTransactions = Sale::with(['saleItems', 'saleItems.product', 'saleItems.customProduct', 'saleItems.printout', 'customer', 'user', 'cheque'])
+            ->orderBy('id', 'desc')
+            ->paginate(50);
 
-    $companyInfo = CompanyInfo::all();
+        $companyInfo = CompanyInfo::all();
 
-    return Inertia::render('TransactionHistory/Index', [
-        'allhistoryTransactions' => $allhistoryTransactions,
-        'totalhistoryTransactions' => $allhistoryTransactions->count(),
-        'companyInfo' => $companyInfo,
-    ]);
-}
+        return Inertia::render('TransactionHistory/Index', [
+            'allhistoryTransactions' => $allhistoryTransactions,
+            'totalhistoryTransactions' => $allhistoryTransactions->total(),
+            'companyInfo' => $companyInfo,
+        ]);
+    }
 
 public function destroy(Request $request)
 {

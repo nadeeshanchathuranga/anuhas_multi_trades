@@ -13,15 +13,15 @@ class CustomerController extends Controller
      * Display a listing of the resource.
      */
    public function index()
-{
-    $allcustomers = Customer::orderBy('id', 'desc')->get();
-    $totalCustomers = $allcustomers->count();
+    {
+        $allcustomers = Customer::orderBy('id', 'desc')->paginate(50);
+        $totalCustomers = $allcustomers->total();
 
-    return Inertia::render('Customers/Index', [
-        'allcustomers'   => $allcustomers,
-        'totalCustomers' => $totalCustomers, // <-- pass the integer
-    ]);
-}
+        return Inertia::render('Customers/Index', [
+            'allcustomers'   => $allcustomers,
+            'totalCustomers' => $totalCustomers,
+        ]);
+    }
 
 
     public function create()
