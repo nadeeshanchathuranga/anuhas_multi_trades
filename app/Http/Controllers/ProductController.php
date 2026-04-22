@@ -180,9 +180,9 @@ public function fetchProducts(Request $request)
             'products' => $products,
             'rawProducts' => $products->items(), // send current page items for barcode modal
             'allcategories' => $allcategories,
-            'colors' => Color::pluck('name', 'id'),
-            'sizes' => Size::pluck('name', 'id'),
-            'suppliers' => Supplier::pluck('name', 'id'),
+            'colors' => Color::select('id', 'name')->orderBy('name')->get(),
+            'sizes' => Size::select('id', 'name')->orderBy('name')->get(),
+            'suppliers' => Supplier::select('id', 'name')->orderBy('name')->get(),
             'totalProducts' => $totalProducts,
             'search' => $query,
             'sort' => $sortOrder,

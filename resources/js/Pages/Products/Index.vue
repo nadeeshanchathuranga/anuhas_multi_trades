@@ -605,7 +605,7 @@
    const sort = ref(props.sort || "");
    const color = ref(props.color || "");
    const size = ref(props.size || "");
-   const suppliers = ref(props.suppliers || "");
+   const suppliers = ref(props.suppliers || []);
    const stockStatus = ref(props.stockStatus || "");
    const selectedCategory = ref(props.selectedCategory || "");
 
