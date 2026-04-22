@@ -20,7 +20,7 @@ class SupplierController extends Controller
     public function index()
     {
         // Paginate and limit eager loaded relationships
-        $allsuppliers = Supplier::with([
+        $supplierPaginator = Supplier::with([
             'numbers' => function ($query) {
                 $query->orderBy('id', 'desc')->limit(10);  // Limit related numbers
             },
@@ -32,8 +32,8 @@ class SupplierController extends Controller
         ->paginate(50);
 
         return Inertia::render('Suppliers/Index', [
-            'allsuppliers' => $allsuppliers,
-            'totalSuppliers' => $allsuppliers->total()
+            'allsuppliers' => $supplierPaginator->items(),
+            'totalSuppliers' => $supplierPaginator->total()
         ]);
     }
 

@@ -100,8 +100,7 @@ class CreditController extends Controller
         \Log::info('Sending credit bills:', ['data' => $creditBills]);
 
         return Inertia::render('CreditPayment/Index', [
-            'creditBills' => $creditBillsPaginated,
-            'creditBillsData' => $creditBills,
+            'creditBills' => $creditBills,
             'customers' => $customers,
         ]);
     }

@@ -16,15 +16,15 @@ class TransactionHistoryController extends Controller
 {
     public function index()
     {
-        $allhistoryTransactions = Sale::with(['saleItems', 'saleItems.product', 'saleItems.customProduct', 'saleItems.printout', 'customer', 'user', 'cheque'])
+        $historyTransactionPaginator = Sale::with(['saleItems', 'saleItems.product', 'saleItems.customProduct', 'saleItems.printout', 'customer', 'user', 'cheque'])
             ->orderBy('id', 'desc')
             ->paginate(50);
 
         $companyInfo = CompanyInfo::all();
 
         return Inertia::render('TransactionHistory/Index', [
-            'allhistoryTransactions' => $allhistoryTransactions,
-            'totalhistoryTransactions' => $allhistoryTransactions->total(),
+            'allhistoryTransactions' => $historyTransactionPaginator->items(),
+            'totalhistoryTransactions' => $historyTransactionPaginator->total(),
             'companyInfo' => $companyInfo,
         ]);
     }

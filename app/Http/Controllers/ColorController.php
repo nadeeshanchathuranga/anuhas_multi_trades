@@ -15,11 +15,11 @@ class ColorController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $allcolors = Color::orderBy('id', 'desc')->paginate(50);
+        $colorPaginator = Color::orderBy('id', 'desc')->paginate(50);
 
         return Inertia::render('Color/Index', [
-            'allcolors' => $allcolors,
-            'totalColors' => $allcolors->total(),
+            'allcolors' => $colorPaginator->items(),
+            'totalColors' => $colorPaginator->total(),
         ]);
     }
 

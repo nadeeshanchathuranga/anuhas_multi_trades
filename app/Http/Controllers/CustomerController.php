@@ -14,11 +14,11 @@ class CustomerController extends Controller
      */
    public function index()
     {
-        $allcustomers = Customer::orderBy('id', 'desc')->paginate(50);
-        $totalCustomers = $allcustomers->total();
+        $customerPaginator = Customer::orderBy('id', 'desc')->paginate(50);
+        $totalCustomers = $customerPaginator->total();
 
         return Inertia::render('Customers/Index', [
-            'allcustomers'   => $allcustomers,
+            'allcustomers'   => $customerPaginator->items(),
             'totalCustomers' => $totalCustomers,
         ]);
     }

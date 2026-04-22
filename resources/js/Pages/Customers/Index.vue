@@ -83,7 +83,7 @@
         <div class="flex items-center">
           <p class="text-3xl italic font-bold text-black">
             <span class="px-4 py-1 mr-3 text-white bg-black rounded-xl">
-              {{ totalCustomers.length }}
+              {{ totalCustomers }}
             </span>
             <span class="text-xl">/ Total Customers</span>
           </p>
@@ -244,7 +244,7 @@ import { HasRole } from "@/Utils/Permissions";
 
 defineProps({
   allcustomers: Array,
-  totalCustomers: Array,
+  totalCustomers: Number,
 });
 
 

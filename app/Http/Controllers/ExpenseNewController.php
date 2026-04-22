@@ -21,13 +21,13 @@ class ExpenseNewController extends Controller
         // View permission: Admin or Manager
 
 
-        $expenses = ExpenseNew::query()
+        $expensePaginator = ExpenseNew::query()
             ->latest('id')
             ->paginate(50);
 
         return Inertia::render('ExpenseNew/Index', [
-            'expenses'      => $expenses,
-            'totalExpenses' => $expenses->total(),
+            'expenses'      => $expensePaginator->items(),
+            'totalExpenses' => $expensePaginator->total(),
             'sumAmount'     => ExpenseNew::sum('amount'),
         ]);
     }

@@ -15,11 +15,11 @@ class SizeController extends Controller
         if (!Gate::allows('hasRole', ['Admin','Manager'])) {
             abort(403, 'Unauthorized');
         }
-        $allsize = Size::orderBy('id', 'desc')->paginate(50);
+        $sizePaginator = Size::orderBy('id', 'desc')->paginate(50);
 
         return Inertia::render('Size/Index', [
-            'allsize' => $allsize,
-            'totalSize' => $allsize->total()
+            'allsize' => $sizePaginator->items(),
+            'totalSize' => $sizePaginator->total()
         ]);
     }
 
