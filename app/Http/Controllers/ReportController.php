@@ -31,7 +31,7 @@ class ReportController extends Controller
         $from = $startDateRaw ? Carbon::parse($startDateRaw)->startOfDay() : null;
         $to   = $endDateRaw   ? Carbon::parse($endDateRaw)->endOfDay()     : null;
 
-        // Reusable created_at window
+        // Reusable created_at window (for InCash, Expenses, etc.)
         $applyCreatedWindow = function ($q) use ($from, $to) {
             if ($from && $to) {
                 $q->whereBetween('created_at', [$from, $to]);
@@ -42,10 +42,21 @@ class ReportController extends Controller
             }
         };
 
-        // -------- Top Products (sold in range via Sale.created_at) - Paginate to limit memory --------
+        // Reusable sale_date window (for Sales and SaleItems)
+        $applySaleDateWindow = function ($q) use ($from, $to) {
+            if ($from && $to) {
+                $q->whereBetween('sale_date', [$from, $to]);
+            } elseif ($from) {
+                $q->where('sale_date', '>=', $from);
+            } elseif ($to) {
+                $q->where('sale_date', '<=', $to);
+            }
+        };
+
+        // -------- Top Products (sold in range via Sale.sale_date) - Paginate to limit memory --------
         if ($from || $to) {
-            $productIds = SaleItem::whereHas('sale', function ($q) use ($applyCreatedWindow) {
-                    $applyCreatedWindow($q);
+            $productIds = SaleItem::whereHas('sale', function ($q) use ($applySaleDateWindow) {
+                    $applySaleDateWindow($q);
                 })
                 ->pluck('product_id')
                 ->unique();
@@ -60,11 +71,11 @@ class ReportController extends Controller
                 ->get();
         }
 
-        // -------- Sales (filter by created_at) - Paginate to limit memory --------
+        // -------- Sales (filter by sale_date) - Paginate to limit memory --------
         $salesQuery = Sale::with(['saleItems.product.category', 'employee', 'customer']);
 
         if ($from || $to) {
-            $applyCreatedWindow($salesQuery);
+            $applySaleDateWindow($salesQuery);
         }
 
         // -------- Credit Bills (filter by payment dates, not creation date) - Paginate to limit memory --------
@@ -106,8 +117,8 @@ class ReportController extends Controller
         });
 
         // For qty per product (respect same window through parent sale)
-        $salesQuantitiesQuery = SaleItem::query()->whereHas('sale', function ($q) use ($applyCreatedWindow, $from, $to) {
-            if ($from || $to) $applyCreatedWindow($q);
+        $salesQuantitiesQuery = SaleItem::query()->whereHas('sale', function ($q) use ($applySaleDateWindow, $from, $to) {
+            if ($from || $to) $applySaleDateWindow($q);
         });
 
         $salesQuantities = $salesQuantitiesQuery
@@ -271,6 +282,8 @@ class ReportController extends Controller
             'categorySales'             => $categorySales,
             'employeeSalesSummary'      => $employeeSalesSummary,
             'paymentMethodTotals'       => $paymentMethodTotals,
+
+            'totalCostAmount'            => round($totalCost, 2),
 
             'totalExpenseAmount'        => round($totalExpenseAmount, 2),
             'totalExpenseCount'         => $totalExpenseCount,

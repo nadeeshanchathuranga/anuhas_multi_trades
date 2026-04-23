@@ -67,17 +67,17 @@
           <h2 class="text-xl font-extrabold tracking-wide text-black uppercase">Total Sales</h2>
           <h2 class="text-xl font-extrabold tracking-wide text-black uppercase">Amount</h2>
         </div>
-        <p class="text-2xl font-bold text-black">{{ salesGrossTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR</p>
+        <p class="text-2xl font-bold text-black">{{ toMoney(totalRevenue) }} LKR</p>
       </div>
 
       <div class="py-6 flex flex-col justify-center items-center border-2 border-[#488D3F] w-full space-y-8 rounded-2xl bg-[#488D3F66] shadow-lg hover:-translate-y-1 transition">
         <h2 class="text-xl font-extrabold tracking-wide text-black uppercase">Net Profit</h2>
-        <p class="text-2xl font-bold text-black">{{ toMoney(salesProfitTotal) }} LKR</p>
+        <p class="text-2xl font-bold text-black">{{ toMoney(netProfit) }} LKR</p>
       </div>
 
       <div class="py-6 flex flex-col justify-center items-center border-2 border-[#16D0EC] w-full space-y-4 rounded-2xl bg-[#16D0EC66] shadow-lg hover:-translate-y-1 transition">
         <h2 class="text-xl font-extrabold tracking-wide text-black uppercase">Total Discount</h2>
-        <p class="text-2xl font-bold text-black">{{ toMoney(salesDiscountTotal) }} LKR</p>
+        <p class="text-2xl font-bold text-black">{{ toMoney(totalDiscountLkr) }} LKR</p>
       </div>
 
       <div class="py-6 flex flex-col justify-center items-center border-2 border-[#9E16EC] w-full space-y-4 rounded-2xl bg-[#9E16EC66] shadow-lg hover:-translate-y-1 transition">
@@ -106,7 +106,7 @@
 
        <div class="py-6 flex flex-col justify-center items-center border-2 border-[#EC16D7] w-full space-y-4 rounded-2xl bg-[#EC16D766] shadow-lg hover:-translate-y-1 transition">
         <h2 class="text-xl font-extrabold tracking-wide text-black uppercase">Total InCash:</h2>
-        <p class="text-2xl font-bold text-black">{{ (salesGrossTotal + totalInCashAmount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR</p>
+        <p class="text-2xl font-bold text-black">{{ (totalRevenue + totalInCashAmount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR</p>
       </div>
 
       <div class="py-6 flex flex-col justify-center items-center border-2 border-[#41ec16] w-full space-y-4 rounded-2xl bg-[#41ec16] shadow-lg">
@@ -178,7 +178,7 @@
             <p class="text-sm font-extrabold text-black uppercase">
               Final Selling Price :
               <span class="text-base font-bold">
-                {{ salesGrossTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR
+                {{ toMoney(totalRevenue) }} LKR
               </span>
             </p>
           </div>
@@ -186,7 +186,7 @@
             <p class="text-sm font-extrabold text-black uppercase">
               Discounts:
               <span class="text-base font-bold">
-                {{ salesDiscountTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR
+                {{ toMoney(totalDiscountLkr) }} LKR
               </span>
             </p>
           </div>
@@ -194,7 +194,7 @@
             <p class="text-sm font-extrabold text-black uppercase">
               Profit:
               <span class="text-base font-bold">
-                {{ salesProfitTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR
+                {{ toMoney(netProfit) }} LKR
               </span>
             </p>
           </div>
@@ -305,18 +305,18 @@
           <tfoot class="bg-gray-50 text-[12px] font-semibold">
             <tr>
               <td class="p-3 text-right" colspan="4">Totals:</td>
-              <td class="p-3 text-center">{{ salesTotalQty.toLocaleString() }}</td>
+              <td class="p-3 text-center">{{ totalTransactions }}</td>
               <td class="p-3 num text-center">
-                {{ salesGrossTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}
+                {{ toMoney(totalRevenue) }}
               </td>
               <td class="p-3 num text-center">
-                {{ salesDiscountTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}
+                {{ toMoney(totalDiscountLkr) }}
               </td>
               <td class="p-3 num text-center">
-                {{ salesCostTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}
+                {{ toMoney(totalCostAmount) }}
               </td>
               <td class="p-3 num text-center">
-                {{ salesProfitTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}
+                {{ toMoney(netProfit) }}
               </td>
             </tr>
           </tfoot>
@@ -723,6 +723,7 @@ const props = defineProps({
   totalInCashAmount: { type: Number, default: 0 },
   totalInCashCount: { type: Number, default: 0 },
   paymentMethodTotals: { type: Object, default: () => ({}) },
+  totalCostAmount: { type: Number, default: 0 },
 });
 
 // State
