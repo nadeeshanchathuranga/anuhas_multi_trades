@@ -25,6 +25,14 @@ class TransactionHistoryController extends Controller
         return Inertia::render('TransactionHistory/Index', [
             'allhistoryTransactions' => $historyTransactionPaginator->items(),
             'totalhistoryTransactions' => $historyTransactionPaginator->total(),
+            'historyPagination' => [
+                'current_page' => $historyTransactionPaginator->currentPage(),
+                'last_page' => $historyTransactionPaginator->lastPage(),
+                'per_page' => $historyTransactionPaginator->perPage(),
+                'from' => $historyTransactionPaginator->firstItem(),
+                'to' => $historyTransactionPaginator->lastItem(),
+                'total' => $historyTransactionPaginator->total(),
+            ],
             'companyInfo' => $companyInfo,
         ]);
     }

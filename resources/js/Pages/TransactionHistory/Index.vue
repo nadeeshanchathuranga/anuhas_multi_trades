@@ -50,7 +50,7 @@
               :key="history.id"
               class="transition duration-200 ease-in-out hover:bg-gray-100"
             >
-              <td class="px-6 py-3">{{ index + 1 }}</td>
+              <td class="px-6 py-3">{{ rowNumber(index) }}</td>
 
               <!-- Order ID (+ Return Bill badge) -->
               <td class="p-4 font-bold border-gray-200">
@@ -165,6 +165,47 @@
         </table>
       </div>
 
+      <div
+        v-if="Number(historyPagination?.last_page || 1) > 1"
+        class="mt-5 flex flex-wrap items-center justify-between gap-3"
+      >
+        <p class="text-sm text-gray-600">
+          Showing {{ historyPagination?.from || 0 }} to {{ historyPagination?.to || 0 }} of {{ historyPagination?.total || 0 }} entries
+        </p>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            @click="goToPage((historyPagination?.current_page || 1) - 1)"
+            :disabled="Number(historyPagination?.current_page || 1) <= 1"
+            class="px-3 py-1.5 rounded-md border border-blue-400 text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+
+          <button
+            v-for="page in visiblePages"
+            :key="page"
+            @click="goToPage(page)"
+            :class="[
+              'px-3 py-1.5 rounded-md border',
+              Number(historyPagination?.current_page || 1) === page
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'border-blue-400 text-blue-600 hover:bg-blue-50'
+            ]"
+          >
+            {{ page }}
+          </button>
+
+          <button
+            @click="goToPage((historyPagination?.current_page || 1) + 1)"
+            :disabled="Number(historyPagination?.current_page || 1) >= Number(historyPagination?.last_page || 1)"
+            class="px-3 py-1.5 rounded-md border border-blue-400 text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
       <div v-else class="w-full bg-white rounded-2xl shadow p-10 text-center">
         <p class="text-red-500 text-lg">No Stock Transition Available</p>
       </div>
@@ -211,7 +252,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import { Head, Link, router, useForm } from "@inertiajs/vue3";
 import axios from "axios";
 import Header from "@/Components/custom/Header.vue";
@@ -229,8 +270,43 @@ import {
 const props = defineProps({
   allhistoryTransactions: { type: Array, default: () => [] },
   totalhistoryTransactions: { type: Number, default: 0 },
+  historyPagination: { type: Object, default: () => ({}) },
   companyInfo: { type: Array, default: () => [] }, // [ { name, address, phone, phone2, email, website } ]
 });
+
+const rowNumber = (index) => {
+  const from = Number(props.historyPagination?.from || 0);
+  return from > 0 ? from + index : index + 1;
+};
+
+const visiblePages = computed(() => {
+  const current = Number(props.historyPagination?.current_page || 1);
+  const last = Number(props.historyPagination?.last_page || 1);
+  const size = 5;
+  let start = Math.max(1, current - Math.floor(size / 2));
+  let end = Math.min(last, start + size - 1);
+
+  if (end - start + 1 < size) {
+    start = Math.max(1, end - size + 1);
+  }
+
+  const pages = [];
+  for (let p = start; p <= end; p += 1) pages.push(p);
+  return pages;
+});
+
+const goToPage = (page) => {
+  const target = Number(page || 1);
+  const current = Number(props.historyPagination?.current_page || 1);
+  const last = Number(props.historyPagination?.last_page || 1);
+
+  if (target < 1 || target > last || target === current) return;
+
+  // Force a full browser reload for each pagination click.
+  const url = new URL(route("transactionHistory.index"), globalThis.location.origin);
+  url.searchParams.set("page", String(target));
+  globalThis.location.href = url.toString();
+};
 
 const form = useForm({});
 
@@ -312,8 +388,9 @@ const initTable = async () => {
   }
 
   dtInstance = $("#TransitionTable").DataTable({
-    dom: "Bfrtip",
-    pageLength: 10,
+    dom: "frt",
+    paging: false,
+    info: false,
     responsive: true,
     buttons: [],
     columnDefs: [{ targets: [2, 8], orderable: false }],
@@ -346,7 +423,7 @@ const deleteReceipt = (orderId) => {
         alert("Error: " + (error?.message || "Something went wrong."));
       },
       onSuccess: () => {
-        router.reload({ only: ["allhistoryTransactions", "totalhistoryTransactions"] });
+        router.reload({ only: ["allhistoryTransactions", "totalhistoryTransactions", "historyPagination"] });
       },
     });
   }
@@ -358,7 +435,7 @@ const markChequeAsPaid = (chequeId) => {
     router.post(route("cheque.markAsPaid"), { cheque_id: chequeId }, {
       onSuccess: () => {
         alert("Cheque marked as paid.");
-        router.reload({ only: ["allhistoryTransactions"] });
+        router.reload({ only: ["allhistoryTransactions", "historyPagination"] });
       },
       onError: () => {
         alert("Failed to update cheque status.");
@@ -370,7 +447,7 @@ const markChequeAsPaid = (chequeId) => {
 const markGuideCompleted = async (saleId) => {
   try {
     await axios.put(`/sales/${saleId}/mark-guide-completed`);
-    router.reload({ only: ["allhistoryTransactions"] });
+    router.reload({ only: ["allhistoryTransactions", "historyPagination"] });
   } catch (e) {
     console.error(e);
     alert("Failed to update guide status.");
@@ -601,7 +678,7 @@ const submitPayment = () => {
     {
       onSuccess: () => {
         closePaymentModal();
-        router.reload({ only: ["allhistoryTransactions"] });
+        router.reload({ only: ["allhistoryTransactions", "historyPagination"] });
       },
       onError: () => alert("Payment failed."),
     }
