@@ -155,22 +155,29 @@ public function fetchProducts(Request $request)
         // Other dropdown / alert data - Use pluck for dropdowns to save memory
         $allcategories = Category::select('id', 'name', 'parent_id')->get();
 
-        // Limit preorder alerts to only products that need attention
+        $preOrderCondition = function ($q) {
+            $q->where('stock_quantity', '<=', 0)
+              ->orWhere(function ($sub) {
+                  $sub->whereNotNull('preorder_level_qty')
+                      ->where('preorder_level_qty', '>', 0)
+                      ->whereColumn('stock_quantity', '<=', 'preorder_level_qty');
+              });
+        };
+
+        // Real total count for the badge (no limit)
+        $preOrderAlertCount = Product::whereNotNull('name')
+            ->where($preOrderCondition)
+            ->count();
+
+        // Top 100 most critical products for the modal (out-of-stock first, then lowest stock)
         $preOrderProducts = Product::with(['category', 'supplier'])
             ->select('id', 'name', 'code', 'batch_no', 'stock_quantity', 'preorder_level_qty', 'category_id', 'supplier_id')
             ->whereNotNull('name')
-            ->where(function ($q) {
-                $q->where('stock_quantity', '<=', 0)
-                  ->orWhere(function ($sub) {
-                      $sub->whereNotNull('preorder_level_qty')
-                          ->where('preorder_level_qty', '>', 0)
-                          ->whereColumn('stock_quantity', '<=', 'preorder_level_qty');
-                  });
-            })
-            ->limit(50)
+            ->where($preOrderCondition)
+            ->orderByRaw('CASE WHEN stock_quantity <= 0 THEN 0 ELSE 1 END ASC')
+            ->orderBy('stock_quantity', 'asc')
+            ->limit(100)
             ->get();
-
-        $preOrderAlertCount = $preOrderProducts->count();
 
         // Calculate only products that are actually expiring soon (in DB query)
         $expiryProducts = Product::select('id', 'name', 'expire_date', 'expiry_date_margin', 'category_id', 'supplier_id')
