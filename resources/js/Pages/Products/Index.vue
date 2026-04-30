@@ -493,19 +493,8 @@
 
    const emit = defineEmits(["update:open"]);
    const preOrderAlertCount = computed(() => {
-     if (props.preOrderProducts && props.preOrderProducts.data) {
-       return props.preOrderProducts.data.filter(product => {
-         const preorderLevel = product.preorder_level_qty || 0;
-         const currentStock = product.total_quantity || 0;
-         return preorderLevel > 0 && currentStock <= preorderLevel;
-       }).length;
-     } else if (props.preOrderProducts && Array.isArray(props.preOrderProducts)) {
-       return props.preOrderProducts.filter(product => {
-         const preorderLevel = product.preorder_level_qty || 0;
-         const currentStock = product.total_quantity || 0;
-         return preorderLevel > 0 && currentStock <= preorderLevel;
-       }).length;
-     }
+     const source = props.preOrderProducts?.data ?? (Array.isArray(props.preOrderProducts) ? props.preOrderProducts : null);
+     if (source) return source.length;
      return props.preOrderAlertCount || 0;
    });
 
@@ -538,32 +527,9 @@
    };
 
    const openPreOrderModal = () => {
-     // Check if preOrderProducts exists and has data
-     if (props.preOrderProducts && props.preOrderProducts.data) {
-       // Filter products that are at or below pre-order level
-       const filtered = props.preOrderProducts.data.filter(product => {
-         const preorderLevel = product.preorder_level_qty || 0;
-         const currentStock = product.total_quantity || 0;
-         return preorderLevel > 0 && currentStock <= preorderLevel;
-       });
-
-       preOrderProducts.value = filtered;
-       isPreOrderModalOpen.value = true;
-     } else if (props.preOrderProducts && Array.isArray(props.preOrderProducts)) {
-       // Handle case where preOrderProducts is directly an array
-       const filtered = props.preOrderProducts.filter(product => {
-         const preorderLevel = product.preorder_level_qty || 0;
-         const currentStock = product.total_quantity || 0;
-         return preorderLevel > 0 && currentStock <= preorderLevel;
-       });
-
-       preOrderProducts.value = filtered;
-       isPreOrderModalOpen.value = true;
-     } else {
-       // No pre-order products data available
-       preOrderProducts.value = [];
-       isPreOrderModalOpen.value = true;
-     }
+     const source = props.preOrderProducts?.data ?? (Array.isArray(props.preOrderProducts) ? props.preOrderProducts : []);
+     preOrderProducts.value = source;
+     isPreOrderModalOpen.value = true;
    };
 
    const openExpiryModal = () => {

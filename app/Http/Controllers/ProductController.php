@@ -156,9 +156,18 @@ public function fetchProducts(Request $request)
         $allcategories = Category::select('id', 'name', 'parent_id')->get();
 
         // Limit preorder alerts to only products that need attention
-        $preOrderProducts = Product::select('id', 'name', 'total_quantity', 'preorder_level_qty', 'category_id', 'supplier_id')
-            ->whereColumn('total_quantity', '<=', 'preorder_level_qty')
-            ->limit(50)  // Limit to top 50 alerts instead of fetching all
+        $preOrderProducts = Product::with(['category', 'supplier'])
+            ->select('id', 'name', 'code', 'batch_no', 'stock_quantity', 'preorder_level_qty', 'category_id', 'supplier_id')
+            ->whereNotNull('name')
+            ->where(function ($q) {
+                $q->where('stock_quantity', '<=', 0)
+                  ->orWhere(function ($sub) {
+                      $sub->whereNotNull('preorder_level_qty')
+                          ->where('preorder_level_qty', '>', 0)
+                          ->whereColumn('stock_quantity', '<=', 'preorder_level_qty');
+                  });
+            })
+            ->limit(50)
             ->get();
 
         $preOrderAlertCount = $preOrderProducts->count();

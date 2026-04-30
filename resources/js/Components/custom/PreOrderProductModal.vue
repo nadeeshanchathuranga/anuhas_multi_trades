@@ -30,7 +30,7 @@
                   <div class="bg-red-600 text-white px-6 py-4 flex items-center justify-between">
                      <div class="flex items-center space-x-3">
                         <DialogTitle class="text-2xl font-bold">
-                           Pre-Order Alert - Low Stock Productsddd
+                           Pre-Order Alert - Low Stock Products
                         </DialogTitle>
                      </div>
                      <button
@@ -111,7 +111,7 @@
 
                                     <td class="px-4 py-4 text-center">
                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-md font-medium bg-red-100 text-red-800">
-                                          {{ product.total_quantity || 0 }}
+                                          {{ product.stock_quantity ?? 0 }}
                                        </span>
                                     </td>
                                     <td class="px-4 py-4 text-center">
@@ -187,7 +187,7 @@ const emit = defineEmits(["update:open"]);
 
 // Helper function to determine status class
 const getStatusClass = (product) => {
-  const currentStock = product.total_quantity || 0;
+  const currentStock = product.stock_quantity ?? 0;
   const preorderLevel = product.preorder_level_qty || 0;
 
   if (currentStock === 0) {
@@ -200,7 +200,7 @@ const getStatusClass = (product) => {
 
 // Helper function to determine status text
 const getStatusText = (product) => {
-  const currentStock = product.total_quantity || 0;
+  const currentStock = product.stock_quantity ?? 0;
   const preorderLevel = product.preorder_level_qty || 0;
 
   if (currentStock === 0) {
@@ -215,15 +215,14 @@ const getStatusText = (product) => {
 const exportReport = () => {
   // Create CSV content
   const csvContent = [
-    'Product Name,Category,Supplier,Code,Batch No,Color,Size,Current Stock,Pre-Order Level,Status',
+    'Product Name,Category,Supplier,Code,Batch No,Current Stock,Pre-Order Level,Status',
     ...props.preOrderProducts.map(product => [
       product.name || 'N/A',
       product.category?.name || 'N/A',
       product.supplier?.name || 'N/A',
       product.code || 'N/A',
       product.batch_no || 'N/A',
-
-      product.total_quantity || 0,
+      product.stock_quantity ?? 0,
       product.preorder_level_qty || 0,
       getStatusText(product)
     ].join(','))
