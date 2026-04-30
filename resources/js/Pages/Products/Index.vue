@@ -451,6 +451,7 @@
          />
       <PreOrderProductModal
          :preOrderProducts="preOrderProducts"
+         :totalCount="props.preOrderAlertCount"
          v-model:open="isPreOrderModalOpen"
          />
       <ExpireProductModal
@@ -492,11 +493,7 @@
 
 
    const emit = defineEmits(["update:open"]);
-   const preOrderAlertCount = computed(() => {
-     const source = props.preOrderProducts?.data ?? (Array.isArray(props.preOrderProducts) ? props.preOrderProducts : null);
-     if (source) return source.length;
-     return props.preOrderAlertCount || 0;
-   });
+   const preOrderAlertCount = computed(() => props.preOrderAlertCount || 0);
 
 
 

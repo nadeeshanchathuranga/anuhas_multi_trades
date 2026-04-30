@@ -48,9 +48,14 @@
                         <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
                            <div class="flex items-center">
                               <i class="ri-information-line text-yellow-500 text-xl mr-2"></i>
-                              <p class="text-yellow-700 font-semibold">
-                                 {{ preOrderProducts.length }} product(s) have reached or fallen below their pre-order level.
-                              </p>
+                              <div>
+                                 <p class="text-yellow-700 font-semibold">
+                                    {{ totalCount }} product(s) have reached or fallen below their pre-order level.
+                                 </p>
+                                 <p v-if="totalCount > preOrderProducts.length" class="text-yellow-600 text-sm mt-1">
+                                    Showing top {{ preOrderProducts.length }} most critical (out-of-stock first).
+                                 </p>
+                              </div>
                            </div>
                         </div>
 
@@ -180,6 +185,10 @@ const props = defineProps({
   preOrderProducts: {
     type: Array,
     default: () => []
+  },
+  totalCount: {
+    type: Number,
+    default: 0
   }
 });
 
