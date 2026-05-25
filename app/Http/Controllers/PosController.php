@@ -23,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -721,7 +722,7 @@ public function submit(Request $request)
     catch (\Throwable $e) {
         DB::rollBack();
 
-        \Log::error('Sale/Credit Bill submission error: ' . $e->getMessage(), [
+        Log::error('Sale/Credit Bill submission error: ' . $e->getMessage(), [
             'trace' => $e->getTraceAsString(),
             'request_data' => $request->all()
         ]);
@@ -1021,7 +1022,7 @@ private function upsertCustomerFromArray(array $customerData): ?Customer
                 ->with(['saleItems.product', 'saleItems.returnReason', 'employee', 'customer'])
                 ->first();
 
-            \Log::info('Raw Order Data:', $order ? $order->toArray() : ['order' => null]);
+            Log::info('Raw Order Data:', $order ? $order->toArray() : ['order' => null]);
 
             if (!$order) {
                 return response()->json([
