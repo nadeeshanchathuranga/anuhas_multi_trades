@@ -12,6 +12,7 @@ export default defineConfig({
             input: 'resources/js/app.js',
             valetTls: false,
             refresh: true,
+            detectTls: false,
         }),
         vue({
             template: {
