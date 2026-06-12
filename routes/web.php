@@ -91,6 +91,7 @@ Route::post('/service/submit', [PosController::class, 'serviceSubmit'])
     Route::resource('employees', EmployeeController::class);
     Route::resource('transactionHistory', TransactionHistoryController::class);
     Route::post('/transactions/delete', [TransactionHistoryController::class, 'destroy'])->name('transactions.delete');
+    Route::post('/transactions/delete-verified', [TransactionHistoryController::class, 'verifyAndDelete'])->name('transactions.verifyAndDelete');
     Route::post('/transactions/mark-as-paid', [TransactionHistoryController::class, 'markAsPaid'])->name('transactions.markAsPaid');
     Route::post('/cheque/mark-paid', [TransactionHistoryController::class, 'markAsPaidCheque'])->name('cheque.markAsPaid');
 

@@ -160,17 +160,18 @@ class ReportController extends Controller
             }
         }
 
-        // Payment totals - for regular sales use full amount, for credit bills use paid amount only
-        $paymentMethodTotals = $salesForCalculation->groupBy('payment_method')->map(
-            fn($g) => (float) $g->sum('total_amount')
-        )->toArray();
+        // Payment totals — normalize keys to Title Case so 'card' and 'Card' merge correctly
+        $paymentMethodTotals = [];
+        foreach ($salesForCalculation->groupBy('payment_method') as $method => $group) {
+            $key = ucfirst(strtolower((string) $method));
+            $paymentMethodTotals[$key] = ($paymentMethodTotals[$key] ?? 0) + (float) $group->sum('total_amount');
+        }
 
-        // Add credit bill payments to payment method totals
-        // Use actual payment methods from the filtered payments
+        // Merge credit bill payments using the same normalized key
         foreach ($creditBillsForCalculation as $cb) {
             foreach ($cb->payments as $payment) {
-                $method = $payment->payment_method;
-                $paymentMethodTotals[$method] = ($paymentMethodTotals[$method] ?? 0) + (float) $payment->amount;
+                $key = ucfirst(strtolower((string) $payment->payment_method));
+                $paymentMethodTotals[$key] = ($paymentMethodTotals[$key] ?? 0) + (float) $payment->amount;
             }
         }
 
