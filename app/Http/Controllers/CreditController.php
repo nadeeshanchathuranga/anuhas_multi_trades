@@ -28,20 +28,17 @@ class CreditController extends Controller
      */
     public function index()
     {
-        $creditBillsQuery = CreditBill::with([
+        $creditBills = CreditBill::with([
                 'customer:id,name',
                 'employee:id,name',
                 'payments' => function($query) {
                     $query->orderBy('created_at', 'desc');
                 }
             ])
-            ->orderBy('created_at', 'desc');
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->all();
 
-        // Paginate to limit memory usage
-        $creditBillsPaginated = $creditBillsQuery->paginate(50);
-
-        $creditBills = $creditBillsPaginated->items();
-        
         $creditBills = array_map(function ($bill) {
             // Recalculate paid_amount from payments to ensure accuracy
             $totalPaid = (float) $bill->payments->sum('amount');

@@ -11,6 +11,8 @@ use App\Models\Product;
 use App\Models\CompanyInfo;
 use App\Models\StockTransaction;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class TransactionHistoryController extends Controller
 {
@@ -80,6 +82,45 @@ public function destroy(Request $request)
 
 
 
+
+public function verifyAndDelete(Request $request)
+{
+    $request->validate([
+        'order_id' => 'required|string|exists:sales,order_id',
+        'password' => 'required|string',
+    ]);
+
+    if (!Hash::check($request->password, Auth::user()->password)) {
+        return back()->withErrors(['password' => 'Incorrect password. Deletion was not authorized.']);
+    }
+
+    $sale = Sale::where('order_id', $request->order_id)->first();
+
+    if (!$sale) {
+        return back()->withErrors(['order_id' => 'Sale not found.']);
+    }
+
+    foreach ($sale->saleItems as $saleItem) {
+        $product = Product::find($saleItem->product_id);
+        if ($product) {
+            $product->increment('stock_quantity', $saleItem->quantity);
+
+            StockTransaction::create([
+                'product_id' => $saleItem->product_id,
+                'transaction_type' => 'Deleted',
+                'quantity' => $saleItem->quantity,
+                'transaction_date' => now(),
+                'supplier_id' => $product->supplier_id ?? null,
+                'reason' => null,
+            ]);
+        }
+    }
+
+    SaleItem::where('sale_id', $sale->id)->delete();
+    $sale->delete();
+
+    return redirect()->route('transactionHistory.index')->banner('Record deleted successfully, and stock updated.');
+}
 
 public function markAsPaid(Request $request)
 {
