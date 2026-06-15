@@ -19,3 +19,4 @@ deploy.sh
 refresh_seed.sh
 merge-development.sh
 config.bat
+.env
