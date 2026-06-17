@@ -877,14 +877,7 @@ const chartData = computed(() => ({
 }));
 const chartOptions = { responsive: true, plugins: { legend: { display: true, position: "bottom" } } };
 
-const paymentMethodTotals = computed(() => {
-  const totals = {};
-  props.sales.forEach((s) => {
-    const m = s.payment_method;
-    totals[m] = (totals[m] || 0) + parseFloat(s.total_amount);
-  });
-  return sortDescending(totals);
-});
+const paymentMethodTotals = computed(() => sortDescending(props.paymentMethodTotals));
 const chartData1 = computed(() => ({
   labels: Object.keys(paymentMethodTotals.value),
   datasets: [{ data: Object.values(paymentMethodTotals.value),
