@@ -37,12 +37,9 @@ class CreditController extends Controller
             ])
             ->orderBy('created_at', 'desc');
 
-        // Paginate to limit memory usage
-        $creditBillsPaginated = $creditBillsQuery->paginate(50);
+        $creditBills = $creditBillsQuery->get();
 
-        $creditBills = $creditBillsPaginated->items();
-        
-        $creditBills = array_map(function ($bill) {
+        $creditBills = $creditBills->map(function ($bill) {
             // Recalculate paid_amount from payments to ensure accuracy
             $totalPaid = (float) $bill->payments->sum('amount');
 
@@ -92,7 +89,7 @@ class CreditController extends Controller
                     ];
                 })->values()->toArray(),
             ];
-        }, $creditBills);
+        })->values()->toArray();
 
         $customers = Customer::select('id', 'name')->orderBy('name')->pluck('name', 'id')->toArray();
 
