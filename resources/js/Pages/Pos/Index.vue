@@ -788,7 +788,9 @@
               <select
                 id="order_id"
                 v-model="ReturnbillForm.order_id"
-                class="mt-2 p-4 border border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="mt-2 p-4 border border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-h-64"
+                style="overflow-y: auto;"
+                size="8"
                 required
               >
                 <option value="" disabled>Select an order</option>
