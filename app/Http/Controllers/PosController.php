@@ -39,16 +39,14 @@ class PosController extends Controller
         // Limit categories to only necessary data (avoid loading all with relations)
         $allcategories = Category::select('id', 'name', 'parent_id')->get();
 
-        // Paginate to most recent 100 sales instead of loading all
+        // Load all sales ordered by most recent
         $sales = Sale::with('customer', 'employee')
             ->orderBy('created_at', 'desc')
-            ->limit(100)
             ->get();
 
-        // Paginate to most recent 100 sale items instead of loading all
+        // Load all sale items ordered by most recent
         $saleItems = SaleItem::with('product')
             ->orderBy('created_at', 'desc')
-            ->limit(100)
             ->get();
 
         // Use pluck for dropdown data - more efficient than full records
