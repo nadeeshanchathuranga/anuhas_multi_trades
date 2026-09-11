@@ -104,15 +104,9 @@ class ReportController extends Controller
             $creditBillsQuery->where('paid_amount', '>', 0);
         }
 
-        // For display, limit to 100; for calculations, get distinct count
+        // For display only - limited to 100 rows, safe to hydrate full models
         $creditBillsForDisplay = (clone $creditBillsQuery)->orderBy('created_at', 'desc')->limit(100)->get();
-        $creditBillsForCalculation = (clone $creditBillsQuery)->orderBy('created_at', 'desc')->get();
-
-        // Recalculate paid_amount based on filtered payments (for both display and calculation)
         $creditBillsForDisplay->each(function($bill) {
-            $bill->filtered_paid_amount = $bill->payments->sum('amount');
-        });
-        $creditBillsForCalculation->each(function($bill) {
             $bill->filtered_paid_amount = $bill->payments->sum('amount');
         });
 
@@ -134,119 +128,160 @@ class ReportController extends Controller
             return $product;
         });
 
-        // For display, limit sales; for calculations, get all
+        // For display, limit sales; calculations are done via SQL aggregates below (no full hydration)
         $salesForDisplay = (clone $salesQuery)->orderBy('created_at', 'desc')->limit(100)->get();
-        $salesForCalculation = (clone $salesQuery)->orderBy('created_at', 'desc')->get();
 
-        // Helpers
-        $customDiscountToLkr = function ($sale) {
-            // The custom_discount field always contains the calculated LKR amount,
-            // regardless of custom_discount_type, since POS calculates and stores the final amount
-            return (float) ($sale->custom_discount ?? 0);
-        };
+        // Base (unclamped) query for sales aggregates in this date window
+        $salesAggQuery = Sale::query();
+        if ($from || $to) {
+            $applySaleDateWindow($salesAggQuery);
+        }
 
-        $totalDiscountToLkr = function ($sale) use ($customDiscountToLkr) {
-            $productDiscount = (float) ($sale->discount ?? 0);
-            $customDiscount = $customDiscountToLkr($sale);
-            return $productDiscount + $customDiscount;
-        };
+        // Overall sales totals via SQL aggregate (no row hydration)
+        $salesTotalsRow = (clone $salesAggQuery)
+            ->selectRaw('
+                COALESCE(SUM(total_amount), 0) as total_amount,
+                COALESCE(SUM(total_cost), 0) as total_cost,
+                COALESCE(SUM(discount), 0) as discount,
+                COALESCE(SUM(custom_discount), 0) as custom_discount,
+                COUNT(*) as cnt
+            ')
+            ->first();
 
-        // Category totals (from filtered sales - use full calculation data)
+        $totalSaleAmount         = (float) $salesTotalsRow->total_amount;
+        $totalCost               = (float) $salesTotalsRow->total_cost;
+        $totalProductDiscountLkr = (float) $salesTotalsRow->discount;
+        $totalCustomDiscountLkr  = (float) $salesTotalsRow->custom_discount;
+        $totalAllDiscountLkr     = $totalProductDiscountLkr + $totalCustomDiscountLkr;
+        $salesCount              = (int) $salesTotalsRow->cnt;
+
+        // Category totals via SQL join + groupBy (no full model hydration)
         $categorySales = [];
-        foreach ($salesForCalculation as $sale) {
-            foreach ($sale->saleItems as $item) {
-                $categoryName = $item->product->category->name ?? 'No Category';
-                $categorySales[$categoryName] = ($categorySales[$categoryName] ?? 0) + (float) $item->total_price;
-            }
-        }
+        (clone $salesAggQuery)
+            ->join('sale_items', 'sale_items.sale_id', '=', 'sales.id')
+            ->leftJoin('products', 'products.id', '=', 'sale_items.product_id')
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->selectRaw("COALESCE(categories.name, 'No Category') as category_name, SUM(sale_items.total_price) as total")
+            ->groupBy('category_name')
+            ->get()
+            ->each(function ($row) use (&$categorySales) {
+                $categorySales[$row->category_name] = ($categorySales[$row->category_name] ?? 0) + (float) $row->total;
+            });
 
-        // Payment totals — normalize keys to Title Case so 'card' and 'Card' merge correctly
+        // Payment totals via SQL groupBy — normalize keys to Title Case so 'card' and 'Card' merge correctly
         $paymentMethodTotals = [];
-        foreach ($salesForCalculation->groupBy('payment_method') as $method => $group) {
-            $key = ucfirst(strtolower((string) $method));
-            $paymentMethodTotals[$key] = ($paymentMethodTotals[$key] ?? 0) + (float) $group->sum('total_amount');
-        }
+        (clone $salesAggQuery)
+            ->selectRaw('payment_method, SUM(total_amount) as total')
+            ->groupBy('payment_method')
+            ->get()
+            ->each(function ($row) use (&$paymentMethodTotals) {
+                $key = ucfirst(strtolower((string) $row->payment_method));
+                $paymentMethodTotals[$key] = ($paymentMethodTotals[$key] ?? 0) + (float) $row->total;
+            });
 
-        // Merge credit bill payments using the same normalized key
-        foreach ($creditBillsForCalculation as $cb) {
-            foreach ($cb->payments as $payment) {
-                $key = ucfirst(strtolower((string) $payment->payment_method));
-                $paymentMethodTotals[$key] = ($paymentMethodTotals[$key] ?? 0) + (float) $payment->amount;
-            }
-        }
-
-        // Employee sales (NET) - use full calculation data
+        // Employee sales (NET) via SQL join + groupBy
         $employeeSalesSummary = [];
-        foreach ($salesForCalculation as $sale) {
-            if (!$sale->employee) continue;
-            $name = $sale->employee->name;
-            $employeeSalesSummary[$name] ??= [
-                'Employee Name' => $name,
-                'Total Sales Amount' => 0,
-            ];
-            $gross       = (float) ($sale->total_amount ?? 0);
-            $totalDisc   = $totalDiscountToLkr($sale);
-            $employeeSalesSummary[$name]['Total Sales Amount'] += ($gross - $totalDisc);
+        (clone $salesAggQuery)
+            ->join('employees', 'employees.id', '=', 'sales.employee_id')
+            ->selectRaw('employees.name as employee_name, SUM(sales.total_amount - sales.discount - sales.custom_discount) as net_total')
+            ->groupBy('employees.id', 'employees.name')
+            ->get()
+            ->each(function ($row) use (&$employeeSalesSummary) {
+                $name = $row->employee_name;
+                $employeeSalesSummary[$name] ??= [
+                    'Employee Name' => $name,
+                    'Total Sales Amount' => 0,
+                ];
+                $employeeSalesSummary[$name]['Total Sales Amount'] += (float) $row->net_total;
+            });
+
+        // Credit bills - aggregate via SQL join against payments in the filtered date range
+        $creditBillAggQuery = \App\Models\CreditBill::query();
+        if ($from || $to) {
+            $creditBillAggQuery->whereHas('payments', function($query) use ($from, $to) {
+                if ($from) $query->where('created_at', '>=', $from);
+                if ($to)   $query->where('created_at', '<=', $to);
+            });
+        } else {
+            $creditBillAggQuery->where('paid_amount', '>', 0);
         }
 
-        // Overall stats from regular sales - use full calculation data
-        $totalSaleAmount         = (float) $salesForCalculation->sum('total_amount');
-        $totalCost               = (float) $salesForCalculation->sum('total_cost');
-        $totalProductDiscountLkr = (float) $salesForCalculation->sum('discount');
-        $totalCustomDiscountLkr  = (float) $salesForCalculation->reduce(function($c, $s) use ($customDiscountToLkr) { return $c + $customDiscountToLkr($s); }, 0.0);
-        $totalAllDiscountLkr     = (float) $salesForCalculation->reduce(function($c, $s) use ($totalDiscountToLkr) { return $c + $totalDiscountToLkr($s); }, 0.0);
+        $paymentsSub = \App\Models\CreditBillPayment::query()
+            ->select('credit_bill_id')
+            ->selectRaw('SUM(amount) as filtered_paid_amount');
+        if ($from) $paymentsSub->where('created_at', '>=', $from);
+        if ($to)   $paymentsSub->where('created_at', '<=', $to);
+        $paymentsSub->groupBy('credit_bill_id');
 
-        // Credit bills - only count payments made in the filtered date range - use full calculation data
-        $totalCreditBillPaidAmount = (float) $creditBillsForCalculation->sum('filtered_paid_amount');
+        $creditBillRows = (clone $creditBillAggQuery)
+            ->joinSub($paymentsSub, 'filtered_payments', 'filtered_payments.credit_bill_id', '=', 'credit_bills.id')
+            ->select('credit_bills.total_amount', 'credit_bills.total_cost', 'credit_bills.discount', 'credit_bills.custom_discount', 'filtered_payments.filtered_paid_amount')
+            ->get();
 
-        // Calculate the proportion of payment to apply costs and discounts - use full calculation data
-        $totalCreditDiscountLkr = 0;
-        foreach ($creditBillsForCalculation as $cb) {
+        $totalCreditBillPaidAmount = 0.0;
+        $totalCreditDiscountLkr    = 0.0;
+        $creditBillsCount          = $creditBillRows->count();
+
+        foreach ($creditBillRows as $cb) {
+            $paidAmount = (float) $cb->filtered_paid_amount;
+            $totalCreditBillPaidAmount += $paidAmount;
+
             if ($cb->total_amount > 0) {
-                // Use filtered paid amount (payments in date range)
-                $paymentRatio = $cb->filtered_paid_amount / $cb->total_amount;
-                // Only include proportional cost and discount based on what's been paid in this period
-                $totalCost += ($cb->total_cost * $paymentRatio);
-                $cbProductDiscount = ($cb->discount * $paymentRatio);
-                $cbCustomDiscount = ($customDiscountToLkr($cb) * $paymentRatio);
+                $paymentRatio = $paidAmount / (float) $cb->total_amount;
+                $totalCost += ((float) $cb->total_cost * $paymentRatio);
+                $cbProductDiscount = ((float) $cb->discount * $paymentRatio);
+                $cbCustomDiscount  = ((float) $cb->custom_discount * $paymentRatio);
                 $totalProductDiscountLkr += $cbProductDiscount;
-                $totalCustomDiscountLkr += $cbCustomDiscount;
-                $totalCreditDiscountLkr += ($cbProductDiscount + $cbCustomDiscount);
+                $totalCustomDiscountLkr  += $cbCustomDiscount;
+                $totalCreditDiscountLkr  += ($cbProductDiscount + $cbCustomDiscount);
             }
         }
         $totalAllDiscountLkr += $totalCreditDiscountLkr;
+
+        // Merge credit bill payments into payment method totals (same normalized key)
+        $creditPaymentTotalsQuery = \App\Models\CreditBillPayment::query();
+        if ($from) $creditPaymentTotalsQuery->where('created_at', '>=', $from);
+        if ($to)   $creditPaymentTotalsQuery->where('created_at', '<=', $to);
+        $creditPaymentTotalsQuery
+            ->selectRaw('payment_method, SUM(amount) as total')
+            ->groupBy('payment_method')
+            ->get()
+            ->each(function ($row) use (&$paymentMethodTotals) {
+                $key = ucfirst(strtolower((string) $row->payment_method));
+                $paymentMethodTotals[$key] = ($paymentMethodTotals[$key] ?? 0) + (float) $row->total;
+            });
 
         // Net profit = (regular sales + credit bill payments) - costs - discounts
         $totalRevenue = $totalSaleAmount + $totalCreditBillPaidAmount;
         $netProfit = $totalRevenue - $totalCost - $totalAllDiscountLkr;
 
-        $totalTransactions       = $salesForCalculation->count() + $creditBillsForCalculation->count();
+        $totalTransactions       = $salesCount + $creditBillsCount;
         $averageTransactionValue = $totalTransactions > 0 ? ($totalRevenue / $totalTransactions) : 0;
 
         // Distinct customers (same filter)
         $totalCustomer = (clone $salesQuery)->distinct('customer_id')->count('customer_id');
 
-        // -------- Expenses (filter by created_at) - Paginate for display --------
+        // -------- Expenses (filter by created_at) - Paginate for display, aggregate for totals --------
         $expenseQuery = ExpenseNew::query();
         if ($from || $to) {
             $applyCreatedWindow($expenseQuery);
         }
-        $expensesForDisplay = $expenseQuery->orderBy('created_at', 'desc')->limit(100)->get();
-        $expensesForCalculation = (clone $expenseQuery)->orderBy('created_at', 'desc')->get();
-        
-        $totalExpenseAmount = (float) $expensesForCalculation->sum('amount');
-        $totalExpenseCount  = $expensesForCalculation->count();
+        $expensesForDisplay = (clone $expenseQuery)->orderBy('created_at', 'desc')->limit(100)->get();
 
-        // -------- In Cash Records (filter by created_at) - Paginate for display --------
+        $expenseTotalsRow = (clone $expenseQuery)->selectRaw('COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt')->first();
+        $totalExpenseAmount = (float) $expenseTotalsRow->total;
+        $totalExpenseCount  = (int) $expenseTotalsRow->cnt;
+
+        // -------- In Cash Records (filter by created_at) - Paginate for display, aggregate for totals --------
         $inCashQuery = InCash::query();
         if ($from || $to) {
             $applyCreatedWindow($inCashQuery);
         }
-        $inCashRecordsForDisplay = $inCashQuery->orderBy('created_at', 'desc')->limit(100)->get();
-        $inCashRecordsForCalculation = (clone $inCashQuery)->orderBy('created_at', 'desc')->get();
-        
-        $totalInCashAmount = (float) $inCashRecordsForCalculation->sum('amount');
-        $totalInCashCount = $inCashRecordsForCalculation->count();
+        $inCashRecordsForDisplay = (clone $inCashQuery)->orderBy('created_at', 'desc')->limit(100)->get();
+
+        $inCashTotalsRow = (clone $inCashQuery)->selectRaw('COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt')->first();
+        $totalInCashAmount = (float) $inCashTotalsRow->total;
+        $totalInCashCount = (int) $inCashTotalsRow->cnt;
 
         // -------- Stock Transactions Return - Limit to reduce memory --------
         $stockTransactionsReturn = StockTransaction::with('product')
