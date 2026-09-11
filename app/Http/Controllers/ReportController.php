@@ -25,11 +25,17 @@ class ReportController extends Controller
         }
 
         // Dates (normalize to day bounds)
+        // Default to the last 2 months when no range is given, to avoid scanning the entire table.
         $startDateRaw = $request->input('start_date');
         $endDateRaw   = $request->input('end_date');
 
-        $from = $startDateRaw ? Carbon::parse($startDateRaw)->startOfDay() : null;
-        $to   = $endDateRaw   ? Carbon::parse($endDateRaw)->endOfDay()     : null;
+        if (!$startDateRaw && !$endDateRaw) {
+            $from = Carbon::now()->subMonths(2)->startOfDay();
+            $to   = Carbon::now()->endOfDay();
+        } else {
+            $from = $startDateRaw ? Carbon::parse($startDateRaw)->startOfDay() : null;
+            $to   = $endDateRaw   ? Carbon::parse($endDateRaw)->endOfDay()     : null;
+        }
 
         // Reusable created_at window (for InCash, Expenses, etc.)
         $applyCreatedWindow = function ($q) use ($from, $to) {
@@ -312,8 +318,8 @@ class ReportController extends Controller
             'averageTransactionValue'   => round($averageTransactionValue, 2),
             'totalCustomer'             => $totalCustomer,
 
-            'startDate'                 => $startDateRaw,
-            'endDate'                   => $endDateRaw,
+            'startDate'                 => $startDateRaw ?: $from->toDateString(),
+            'endDate'                   => $endDateRaw   ?: $to->toDateString(),
 
             'categorySales'             => $categorySales,
             'employeeSalesSummary'      => $employeeSalesSummary,
