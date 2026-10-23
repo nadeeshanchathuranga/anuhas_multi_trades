@@ -403,10 +403,8 @@ const computePrice = (item) => {
 
 // final total for a history row
 const finalTotalForHistory = (h) => {
-  const gross = num(h.total_amount);
-  const custom = num(h.custom_discount);
-  const customLkr = h.custom_discount_type === "percent" ? (gross * custom) / 100 : custom;
-  return gross - customLkr;
+  // `discount` (product + item + coupon) and `custom_discount` are both saved as LKR amounts
+  return num(h.total_amount) - num(h.discount) - num(h.custom_discount);
 };
 
 // ---------- preload logo as base64 for printing ----------
@@ -580,6 +578,9 @@ const printReceipt = (history) => {
         finalLineTotal = unitPrice * qty * (1 - discountPercent / 100);
       }
     }
+
+    // Manual per-item discount saved with the sale item
+    finalLineTotal = Math.max(0, finalLineTotal - num(item.item_discount_amount));
 
     return { unitPrice, finalLineTotal };
   };

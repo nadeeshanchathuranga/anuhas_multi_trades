@@ -211,6 +211,15 @@ const handlePrintReceipt = () => {
           }
         }
 
+        // Manual per-item discount (Rs or %), taken off the line after the product's own discount
+        const itemDiscountValue = Number(product.item_discount || 0);
+        if (itemDiscountValue > 0 && finalLineTotal > 0) {
+          const itemDiscountAmount = product.item_discount_type === "percent"
+            ? finalLineTotal * Math.min(itemDiscountValue, 100) / 100
+            : Math.min(itemDiscountValue, finalLineTotal);
+          finalLineTotal = Math.max(0, finalLineTotal - itemDiscountAmount);
+        }
+
         return `
           <tr>
             <td>

@@ -228,12 +228,18 @@ class ReportController extends Controller
         $totalCreditDiscountLkr    = 0.0;
         $creditBillsCount          = $creditBillRows->count();
 
+        $totalCreditGrossEquivalent = 0.0;
+
         foreach ($creditBillRows as $cb) {
             $paidAmount = (float) $cb->filtered_paid_amount;
             $totalCreditBillPaidAmount += $paidAmount;
 
-            if ($cb->total_amount > 0) {
-                $paymentRatio = $paidAmount / (float) $cb->total_amount;
+            // total_amount is gross; the customer pays gross minus discounts
+            $netAmount = (float) $cb->total_amount - (float) $cb->discount - (float) $cb->custom_discount;
+
+            if ($cb->total_amount > 0 && $netAmount > 0) {
+                $paymentRatio = $paidAmount / $netAmount;
+                $totalCreditGrossEquivalent += $paymentRatio * (float) $cb->total_amount;
                 $totalCost += ((float) $cb->total_cost * $paymentRatio);
                 $cbProductDiscount = ((float) $cb->discount * $paymentRatio);
                 $cbCustomDiscount  = ((float) $cb->custom_discount * $paymentRatio);
@@ -258,7 +264,7 @@ class ReportController extends Controller
             });
 
         // Net profit = (regular sales + credit bill payments) - costs - discounts
-        $totalRevenue = $totalSaleAmount + $totalCreditBillPaidAmount;
+        $totalRevenue = $totalSaleAmount + $totalCreditGrossEquivalent;
         $netProfit = $totalRevenue - $totalCost - $totalAllDiscountLkr;
 
         $totalTransactions       = $salesCount + $creditBillsCount;

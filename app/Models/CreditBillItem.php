@@ -17,6 +17,14 @@ class CreditBillItem extends Model
         'quantity',
         'unit_price',
         'total_price',
+        'discount',
+        'apply_discount',
+        'discounted_price',
+        'include_custom',
+        'selling_price',
+        'item_discount',
+        'item_discount_type',
+        'item_discount_amount',
     ];
 
     protected $casts = [

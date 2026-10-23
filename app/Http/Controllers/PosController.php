@@ -84,7 +84,8 @@ class PosController extends Controller
             'barcode' => 'required',
         ]);
 
-        $barcodeOrCode = $request->barcode;
+        // Scanners/typing can leave stray whitespace or line breaks around letters+digits barcodes
+        $barcodeOrCode = trim((string) $request->barcode);
 
         // 🔁 First, try to match as a code (to enable FIFO)
         $products = Product::where('code', $barcodeOrCode)
@@ -260,8 +261,10 @@ public function submit(Request $request)
         // Optional/overrides coming from UI
         'products.*.unit_price' => 'nullable|numeric|min:0',
         'products.*.cost_price' => 'nullable|numeric|min:0',
+        'products.*.item_discount' => 'nullable|numeric|min:0',
+        'products.*.item_discount_type' => 'nullable|string|in:fixed,percent',
 
-        'userId'   => 'required|integer|exists:users,id',
+        'userId'  => 'required|integer|exists:users,id',
         'orderid'  => 'required|string|max:50',
 
         // accept cheque in addition to cash/card/credit
@@ -406,13 +409,15 @@ public function submit(Request $request)
     // ---- DISCOUNTS ----
     // Per-product (if UI marks apply_discount with discount + discounted_price)
     $productDiscounts = 0.0;
-    foreach ($products as $p) {
+    $itemDiscounts    = 0.0;
+    foreach ($products as &$p) {
+        $lineProductDiscount = 0.0;
         if (!empty($p['apply_discount']) && isset($p['discount'], $p['discounted_price'])) {
             $discount = (float)($p['discount'] ?? 0);
             if ($discount > 0) {
                 $originalPrice   = (float)($p['selling_price'] ?? $p['unit_price'] ?? $p['__resolved_unit_price']);
                 $discountedPrice = (float)$p['discounted_price'];
-                $productDiscounts += ($originalPrice - $discountedPrice) * (float)$p['quantity'];
+                $lineProductDiscount = ($originalPrice - $discountedPrice) * (float)$p['quantity'];
             }
         } elseif (!empty($p['apply_discount']) && isset($p['discount'])) {
             // Handle percentage discount without explicit discounted_price
@@ -420,11 +425,26 @@ public function submit(Request $request)
             if ($discount > 0) {
                 $originalPrice   = (float)($p['selling_price'] ?? $p['unit_price'] ?? $p['__resolved_unit_price']);
                 $qty = (float)$p['quantity'];
-                $discountAmount = ($originalPrice * $discount / 100) * $qty;
-                $productDiscounts += $discountAmount;
+                $lineProductDiscount = ($originalPrice * $discount / 100) * $qty;
             }
         }
+        $productDiscounts += $lineProductDiscount;
+
+        // Manual per-item discount (Rs off the line, or % of the line), applied after the product's own discount
+        $lineBase = max(0, (float)$p['__resolved_unit_price'] * (float)$p['quantity'] - $lineProductDiscount);
+        $itemDiscountValue = (float)($p['item_discount'] ?? 0);
+        $itemDiscountType  = ($p['item_discount_type'] ?? 'fixed') === 'percent' ? 'percent' : 'fixed';
+        $itemDiscountAmount = 0.0;
+        if ($itemDiscountValue > 0 && $lineBase > 0) {
+            $itemDiscountAmount = $itemDiscountType === 'percent'
+                ? round($lineBase * min($itemDiscountValue, 100) / 100, 2)
+                : min($itemDiscountValue, $lineBase);
+        }
+        $p['__item_discount_type']   = $itemDiscountType;
+        $p['__item_discount_amount'] = $itemDiscountAmount;
+        $itemDiscounts += $itemDiscountAmount;
     }
+    unset($p);
 
      $totalReturnAmount = collect($returnItems)->reduce(function ($carry, $item) {
             return $carry + ($item['quantity'] * $item['unit_price']);
@@ -435,22 +455,26 @@ public function submit(Request $request)
     $customDiscount = (float) ($validated['custom_discount'] ?? 0);
     $customType     = $validated['custom_discount_type'] ?? 'fixed';
 
-    if ($customType === 'percent') {
-        // Calculate custom discount only on items marked with include_custom
-        $customSubtotal = 0.0;
-        foreach ($products as $p) {
-            if (!empty($p['include_custom'])) {
-                $qty = (float)$p['quantity'];
-                $unitPrice = (float)$p['__resolved_unit_price'];
-                $customSubtotal += $qty * $unitPrice;
-            }
+    // Custom discount only applies to items marked with include_custom
+    $customSubtotal = 0.0;
+    foreach ($products as $p) {
+        if (!empty($p['include_custom'])) {
+            $qty = (float)$p['quantity'];
+            $unitPrice = (float)$p['__resolved_unit_price'];
+            $customSubtotal += $qty * $unitPrice;
         }
+    }
+
+    if ($customType === 'percent') {
         // Apply percentage discount only to custom subtotal
         $customDiscount = round(($customSubtotal * $customDiscount) / 100, 2);
+    } else {
+        $customDiscount = min($customDiscount, $customSubtotal);
     }
 
     // Separate product discounts from custom discount to avoid double counting
-    $totalProductDiscount = max(0, min($totalAmount, $productDiscounts + $couponDiscount));
+    $totalProductDiscount = max(0, min($totalAmount, $productDiscounts + $itemDiscounts + $couponDiscount));
+    $totalBillDiscount    = $totalProductDiscount + $customDiscount;
 
     DB::beginTransaction();
     try {
@@ -514,7 +538,7 @@ public function submit(Request $request)
             // Determine status based on payment
             if ($cashPaid == 0) {
                 $billData['status'] = 'pending';
-            } elseif ($cashPaid >= $totalAmount) {
+            } elseif ($cashPaid >= max(0, $totalAmount - $totalBillDiscount)) {
                 $billData['status'] = 'completed';
             } else {
                 $billData['status'] = 'partial';
@@ -567,6 +591,23 @@ public function submit(Request $request)
                 }
             }
 
+            // Manual per-item discount
+            $itemDiscountAmount = (float)($p['__item_discount_amount'] ?? 0);
+            $lineTotal = max(0, $lineTotal - $itemDiscountAmount);
+
+            // Same discount columns for sale items and credit bill items
+            $discountFields = [
+                'total_price'          => $lineTotal, // Use discounted total
+                'discount'             => $discount,
+                'apply_discount'       => $applyDiscount,
+                'discounted_price'     => $discountedPrice,
+                'include_custom'       => $includeCustom,
+                'selling_price'        => $sellingPrice,
+                'item_discount'        => (float)($p['item_discount'] ?? 0),
+                'item_discount_type'   => $p['__item_discount_type'],
+                'item_discount_amount' => $itemDiscountAmount,
+            ];
+
             if ($itemType === 'custom') {
                 // Handle custom product item
                 // First, create the custom product record
@@ -583,8 +624,7 @@ public function submit(Request $request)
                         'custom_product_id' => $customProduct->id,
                         'quantity'          => $qty,
                         'unit_price'        => $unitPrice,
-                        'total_price'       => $qty * $unitPrice,
-                    ]);
+                    ] + $discountFields);
                 } else {
                     SaleItem::create([
                         'sale_id'           => $bill->id,
@@ -593,13 +633,7 @@ public function submit(Request $request)
                         'custom_product_id' => $customProduct->id,
                         'quantity'          => $qty,
                         'unit_price'        => $unitPrice,
-                        'total_price'       => $lineTotal, // Use discounted total
-                        'discount'          => $discount,
-                        'apply_discount'    => $applyDiscount,
-                        'discounted_price'  => $discountedPrice,
-                        'include_custom'    => $includeCustom,
-                        'selling_price'     => $sellingPrice,
-                    ]);
+                    ] + $discountFields);
                 }
 
                 // No stock to decrement for custom products
@@ -615,8 +649,7 @@ public function submit(Request $request)
                         'printout_id'    => $printoutModel->id,
                         'quantity'       => $qty,
                         'unit_price'     => $unitPrice,
-                        'total_price'    => $qty * $unitPrice,
-                    ]);
+                    ] + $discountFields);
                 } else {
                     SaleItem::create([
                         'sale_id'           => $bill->id,
@@ -624,13 +657,7 @@ public function submit(Request $request)
                         'printout_id'       => $printoutModel->id,
                         'quantity'          => $qty,
                         'unit_price'        => $unitPrice,
-                        'total_price'       => $lineTotal, // Use discounted total
-                        'discount'          => $discount,
-                        'apply_discount'    => $applyDiscount,
-                        'discounted_price'  => $discountedPrice,
-                        'include_custom'    => $includeCustom,
-                        'selling_price'     => $sellingPrice,
-                    ]);
+                    ] + $discountFields);
                 }
 
                 // Printout stock is unlimited - no decrement needed
@@ -645,21 +672,14 @@ public function submit(Request $request)
                         'product_id'     => $productModel->id,
                         'quantity'       => $qty,
                         'unit_price'     => $unitPrice,
-                        'total_price'    => $qty * $unitPrice,
-                    ]);
+                    ] + $discountFields);
                 } else {
                     SaleItem::create([
                         'sale_id'           => $bill->id,
                         'product_id'        => $productModel->id,
                         'quantity'          => $qty,
                         'unit_price'        => $unitPrice,
-                        'total_price'       => $lineTotal, // Use discounted total
-                        'discount'          => $discount,
-                        'apply_discount'    => $applyDiscount,
-                        'discounted_price'  => $discountedPrice,
-                        'include_custom'    => $includeCustom,
-                        'selling_price'     => $sellingPrice,
-                    ]);
+                    ] + $discountFields);
                 }
 
                 // Create stock transaction (for both credit and regular sales)

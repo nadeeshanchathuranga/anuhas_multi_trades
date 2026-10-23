@@ -23,6 +23,9 @@ class SaleItem extends Model
         'discounted_price',
         'include_custom',
         'selling_price',
+        'item_discount',
+        'item_discount_type',
+        'item_discount_amount',
     ];
 
 
