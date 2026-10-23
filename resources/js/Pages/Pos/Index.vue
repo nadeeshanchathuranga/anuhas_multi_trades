@@ -260,15 +260,37 @@
                             </p>
 
                             <p class="text-xl font-bold text-gray-900 mt-1">
-                              <span v-if="item.apply_discount">
-                                {{ ((((isWholesale ? item.whole_price : item.selling_price) || 0) * (1 - (isWholesale ? item.wholesale_discount : item.discount) / 100)) * item.quantity).toFixed(2) }} LKR
-                              </span>
-                              <span v-else>
-                                {{ ((isWholesale ? item.whole_price : item.selling_price) * item.quantity).toFixed(2) }} LKR
-                              </span>
+                              {{ lineTotal(item).toFixed(2) }} LKR
                             </p>
                           </div>
                         </div>
+                      </div>
+
+                      <!-- Per-item discount -->
+                      <div class="flex items-center justify-end gap-2">
+                        <span class="text-sm text-gray-600">Item Discount</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          v-model.number="item.item_discount"
+                          placeholder="0"
+                          :aria-label="`Discount for ${item.name}`"
+                          class="bg-white border border-gray-400 h-9 w-24 text-gray-900 rounded text-center text-lg"
+                        />
+                        <select
+                          v-model="item.item_discount_type"
+                          class="border border-gray-400 h-9 pl-2 pr-7 text-gray-900 rounded text-lg"
+                        >
+                          <option value="fixed">Rs</option>
+                          <option value="percent">%</option>
+                        </select>
+                        <span
+                          v-if="itemDiscountAmount(item) > 0"
+                          class="text-sm font-semibold text-red-600"
+                        >
+                          (-{{ itemDiscountAmount(item).toFixed(2) }})
+                        </span>
                       </div>
                     </div>
 
@@ -1402,7 +1424,44 @@ const subtotal = computed(() => {
   return (productTotal + serviceTotal).toFixed(2);
 });
 
+// Every cart row (scanned, batch, custom, printout...) gets the per-item discount fields
+watch(
+  products,
+  (list) => {
+    list.forEach((p) => {
+      if (p.item_discount == null) p.item_discount = 0;
+      if (p.item_discount_type == null) p.item_discount_type = "fixed";
+    });
+  },
+  { deep: true, immediate: true }
+);
+
+const unitPriceOf = (item) =>
+  (isWholesale.value ? parseFloat(item.whole_price) : parseFloat(item.selling_price ?? item.price)) || 0;
+
+// Discount from the product's own % discount (when applied) for the whole line
+const lineProductDiscount = (item) => {
+  const pct = isWholesale.value ? (item.wholesale_discount || 0) : (item.discount || 0);
+  if (!(pct > 0) || item.apply_discount !== true) return 0;
+  return (unitPriceOf(item) * pct / 100) * (Number(item.quantity) || 0);
+};
+
+// Manual per-item discount, taken off the line after the product's own discount
+const itemDiscountAmount = (item) => {
+  const value = Number(item.item_discount) || 0;
+  const lineBase = Math.max(0, unitPriceOf(item) * (Number(item.quantity) || 0) - lineProductDiscount(item));
+  if (value <= 0 || lineBase <= 0) return 0;
+  return item.item_discount_type === "percent"
+    ? lineBase * Math.min(value, 100) / 100
+    : Math.min(value, lineBase);
+};
+
+const lineTotal = (item) =>
+  Math.max(0, unitPriceOf(item) * (Number(item.quantity) || 0) - lineProductDiscount(item) - itemDiscountAmount(item));
+
 const totalDiscount = computed(() => {
+  const itemLevelDiscount = products.value.reduce((t, item) => t + itemDiscountAmount(item), 0);
+
   const productDiscount = products.value.reduce((t, item) => {
     // Check if discount should be applied
     const discountPercent = isWholesale.value ? (item.wholesale_discount || 0) : (item.discount || 0);
@@ -1440,7 +1499,7 @@ const totalDiscount = computed(() => {
     }
   }
 
-  return (productDiscount + couponDiscount + orderLevelDiscount + customDiscountAmount).toFixed(2);
+  return (productDiscount + itemLevelDiscount + couponDiscount + orderLevelDiscount + customDiscountAmount).toFixed(2);
 });
 
 // NEW: subtotal of products that are ticked for Custom Discount
@@ -1777,15 +1836,27 @@ const handleKeyDown = (event) => {
     isReturnBillsModalOpen.value = true;
   }
 
+  // Shift alone jumps to the summary panel. Decide on keyup, and only if no other key was pressed
+  // while Shift was held - otherwise a scanner's capital letters (sent with Shift) steal the focus
+  // and the barcode never reaches the barcode field.
   if (event.key === "Shift") {
-    event.preventDefault();
-    nextTick(() => {
-      asideRef.value?.focus?.();
-      const first = asideFocusOrder.value?.[0];
-      first?.focus?.();
-      first?.select?.();
-    });
+    if (!event.repeat) shiftPressedAlone = true;
+  } else {
+    shiftPressedAlone = false;
   }
+};
+
+let shiftPressedAlone = false;
+
+const handleKeyUp = (event) => {
+  if (event.key !== "Shift" || !shiftPressedAlone) return;
+  shiftPressedAlone = false;
+  nextTick(() => {
+    asideRef.value?.focus?.();
+    const first = asideFocusOrder.value?.[0];
+    first?.focus?.();
+    first?.select?.();
+  });
 };
 
 const getFocusable = (r) => {
@@ -1836,11 +1907,13 @@ function onAsideKeydown(e) {
 onMounted(() => {
   barcodeInputRef.value?.focus();
   window.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("keyup", handleKeyUp);
   window.addEventListener("keydown", handleScannerKeydown);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleKeyDown);
+  window.removeEventListener("keyup", handleKeyUp);
   window.removeEventListener("keydown", handleScannerKeydown);
 });
 

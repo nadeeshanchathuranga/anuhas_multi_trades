@@ -55,7 +55,7 @@ class CreditController extends Controller
                 $bill->paid_amount = $totalPaid;
 
                 // Update status based on payment
-                if ($totalPaid >= $bill->total_amount) {
+                if ($totalPaid >= $bill->net_amount) {
                     $bill->status = 'completed';
                 } elseif ($totalPaid > 0) {
                     $bill->status = 'partial';
@@ -66,14 +66,17 @@ class CreditController extends Controller
                 $bill->save();
             }
 
-            $pending = max(0, $bill->total_amount - $totalPaid);
+            $pending = max(0, $bill->net_amount - $totalPaid);
 
             return [
                 'id' => $bill->id,
                 'order_id' => $bill->order_id,
                 'customer_name' => $bill->customer ? $bill->customer->name : '-',
                 'employee_name' => $bill->employee ? $bill->employee->name : '-',
-                'total_amount' => (float) $bill->total_amount,
+                // total_amount is what the customer owes (after discounts)
+                'total_amount' => (float) $bill->net_amount,
+                'gross_amount' => (float) $bill->total_amount,
+                'discount_amount' => (float) $bill->discount + (float) $bill->custom_discount,
                 'paid_amount' => (float) $totalPaid,
                 'pending_amount' => (float) $pending,
                 'status' => ucfirst($bill->status),
@@ -126,7 +129,7 @@ class CreditController extends Controller
             $creditBill = CreditBill::findOrFail($validated['credit_bill_id']);
 
             // Calculate remaining amount
-            $remaining = $creditBill->total_amount - $creditBill->paid_amount;
+            $remaining = $creditBill->net_amount - $creditBill->paid_amount;
 
             // Prevent overpayment
             if ($validated['amount'] > $remaining) {
@@ -161,7 +164,7 @@ class CreditController extends Controller
             $newPaidAmount = $creditBill->paid_amount + $validated['amount'];
             $creditBill->paid_amount = $newPaidAmount;
 
-            if ($newPaidAmount >= $creditBill->total_amount) {
+            if ($newPaidAmount >= $creditBill->net_amount) {
                 $creditBill->status = 'completed';
             } elseif ($newPaidAmount > 0) {
                 $creditBill->status = 'partial';
@@ -171,7 +174,7 @@ class CreditController extends Controller
 
             DB::commit();
 
-            $newPending = max(0, $creditBill->total_amount - $newPaidAmount);
+            $newPending = max(0, $creditBill->net_amount - $newPaidAmount);
 
             // Return back to the page with updated data
             return redirect()->back()
@@ -196,7 +199,9 @@ class CreditController extends Controller
             'order_id' => $creditBill->order_id,
             'customer' => $creditBill->customer,
             'employee' => $creditBill->employee,
-            'total_amount' => $creditBill->total_amount,
+            'total_amount' => $creditBill->net_amount,
+            'gross_amount' => $creditBill->total_amount,
+            'discount_amount' => (float) $creditBill->discount + (float) $creditBill->custom_discount,
             'paid_amount' => $creditBill->paid_amount,
             'pending_amount' => $creditBill->pending_amount,
             'status' => $creditBill->status,
