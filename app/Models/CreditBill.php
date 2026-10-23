@@ -69,8 +69,14 @@ class CreditBill extends Model
         return $this->hasMany(CreditBillPayment::class);
     }
 
+    // total_amount is gross; this is what the customer actually owes after discounts
+    public function getNetAmountAttribute()
+    {
+        return max(0, (float) $this->total_amount - (float) $this->discount - (float) $this->custom_discount);
+    }
+
     public function getPendingAmountAttribute()
     {
-        return max(0, $this->total_amount - $this->paid_amount);
+        return max(0, $this->net_amount - (float) $this->paid_amount);
     }
 }
