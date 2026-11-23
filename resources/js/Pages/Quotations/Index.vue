@@ -124,12 +124,25 @@
                 </div>
                 <div>
                     <label for="add_discount" class="block mb-2 text-lg font-medium">Discount:</label>
-                    <input
-                    v-model="form.add_discount"
-                    id="add_discount"
-                    name="add_discount"
-                    class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <div class="flex gap-2">
+                      <input
+                      v-model="form.add_discount"
+                      id="add_discount"
+                      name="add_discount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        v-model="form.add_discount_type"
+                        aria-label="Discount type"
+                        class="px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="fixed">Rs</option>
+                        <option value="percent">%</option>
+                      </select>
+                    </div>
                 </div>
 
                 <div>
@@ -479,8 +492,22 @@ const totalDiscount = computed(() => {
         ? Number(appliedCoupon.value.discount)
         : 0;
 
-    // Get discount from the reactive add_discount value
-    const additionalDiscount = parseFloat(add_discount.value) || 0;
+    // Manual quotation discount (Rs or % of what is left after the other discounts), applied live
+    const base = Math.max(
+        0,
+        (parseFloat(subtotal.value) || 0) +
+            (parseFloat(description_price.value) || 0) -
+            productDiscount -
+            couponDiscount
+    );
+    const entered = parseFloat(form.add_discount) || 0;
+    let additionalDiscount = 0;
+    if (entered > 0) {
+        additionalDiscount =
+            form.add_discount_type === "percent"
+                ? (base * Math.min(entered, 100)) / 100
+                : Math.min(entered, base);
+    }
 
     return (productDiscount + couponDiscount + additionalDiscount).toFixed(2);
 });
@@ -520,6 +547,7 @@ const form = useForm({
     description: "",
     description_price: "",
     add_discount: "",
+    add_discount_type: "fixed",
     valid_date: "",
 });
 

@@ -338,6 +338,11 @@ body {
           : ""
       }
       ${
+        subTotalFromParent - effectiveTotal > 0.005
+          ? `<div class="totals-row"><span>Discount</span><span>-${(subTotalFromParent - effectiveTotal).toFixed(2)}</span></div>`
+          : ""
+      }
+      ${
         customEligibleSubtotal
           ? `<div class="totals-row"><span>Custom Sub Total</span><span>${customEligibleSubtotal.toFixed(2)}</span></div>`
           : ""

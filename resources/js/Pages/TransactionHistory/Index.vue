@@ -692,6 +692,7 @@ body {
     <!-- TOTALS -->
     <div class="totals">
       ${subTotalFromSales ? `<div class="totals-row"><span>Sub Total</span><span>${subTotalFromSales.toFixed(2)}</span></div>` : ""}
+      ${subTotalFromSales - finalTotal > 0.005 ? `<div class="totals-row"><span>Discount</span><span>-${(subTotalFromSales - finalTotal).toFixed(2)}</span></div>` : ""}
       ${customEligibleSubtotal ? `<div class="totals-row"><span>Custom Sub Total</span><span>${customEligibleSubtotal.toFixed(2)}</span></div>` : ""}
       ${customDiscountAmount ? `<div class="totals-row"><span>Custom Discount</span><span>-${customDiscountAmount.toFixed(2)} ${history.custom_discount_type === "percent" ? `(${(customDiscountAmount/customEligibleSubtotal*100).toFixed(0)}%)` : ""}</span></div>` : ""}
       ${finalTotal ? `<div class="totals-row bold"><span>Total</span><span>${finalTotal.toFixed(2)}</span></div>` : ""}
